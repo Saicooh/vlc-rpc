@@ -1,7 +1,6 @@
-import { IpcChannels, IpcEvents } from "@shared/types"
+import { registerHandler } from "@main/ipc"
 import type { DetectedMediaInfo } from "@shared/types/media"
 import type { VlcStatus } from "@shared/types/vlc"
-import { ipcMain } from "electron"
 import { coverArtService } from "../services/cover-art"
 import { imageProxyService } from "../services/image-proxy"
 import { logger } from "../services/logger"
@@ -15,14 +14,11 @@ export class MediaInfoHandler {
 	private lastMediaInfo: (VlcStatus & DetectedMediaInfo) | null = null
 
 	constructor() {
-		this.registerIpcHandlers()
+		this.registerHandlers()
 	}
 
-	/**
-	 * Register IPC handlers for media information
-	 */
-	private registerIpcHandlers(): void {
-		ipcMain.handle(`${IpcChannels.MEDIA}:get-media-info`, async () => {
+	private registerHandlers(): void {
+		registerHandler("media:get-info", async () => {
 			try {
 				const currentStatus = await vlcStatusService.readStatus(false)
 
@@ -37,7 +33,7 @@ export class MediaInfoHandler {
 			}
 		})
 
-		ipcMain.handle(`${IpcChannels.IMAGE}:${IpcEvents.IMAGE_PROXY}`, async (_, url: string) => {
+		registerHandler("image:proxy", async (url) => {
 			return await imageProxyService.getImageAsDataUrl(url)
 		})
 	}

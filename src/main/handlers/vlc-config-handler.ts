@@ -1,12 +1,12 @@
 import { promises as fs } from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
+import { registerHandler } from "@main/ipc"
 import { configService } from "@main/services/config"
 import { logger } from "@main/services/logger"
 import { vlcStatusService } from "@main/services/vlc-status"
 import { VLC_CONFIG_PATHS } from "@shared/constants"
-import { IpcChannels, IpcEvents, type VlcConfig } from "@shared/types"
-import { ipcMain } from "electron"
+import type { VlcConfig } from "@shared/types"
 
 /**
  * Handler for VLC configuration operations
@@ -16,7 +16,7 @@ export class VlcConfigHandler {
 
 	constructor() {
 		this.determineVlcConfigPath()
-		this.registerIpcHandlers()
+		this.registerHandlers()
 		this.synchronizeConfig()
 	}
 
@@ -42,20 +42,14 @@ export class VlcConfigHandler {
 		logger.info(`VLC config path: ${this.vlcConfigPath}`)
 	}
 
-	/**
-	 * Register IPC handlers for VLC config operations
-	 */
-	private registerIpcHandlers(): void {
-		ipcMain.handle(`${IpcChannels.VLC}:${IpcEvents.VLC_CONFIG_GET}`, async () => {
+	private registerHandlers(): void {
+		registerHandler("vlc:config:get", async () => {
 			return await this.getVlcConfig()
 		})
 
-		ipcMain.handle(
-			`${IpcChannels.VLC}:${IpcEvents.VLC_CONFIG_SET}`,
-			async (_, config: VlcConfig) => {
-				return await this.setupVlcConfig(config)
-			},
-		)
+		registerHandler("vlc:config:set", async (config) => {
+			return await this.setupVlcConfig(config)
+		})
 	}
 
 	/**

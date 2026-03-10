@@ -1,8 +1,7 @@
+import { registerHandler } from "@main/ipc"
 import { configService } from "@main/services/config"
 import { logger } from "@main/services/logger"
 import { metadataWriterService } from "@main/services/metadata-writer"
-import { IpcChannels, IpcEvents } from "@shared/types"
-import { ipcMain } from "electron"
 
 /**
  * Metadata handler for IPC communication
@@ -17,12 +16,10 @@ export class MetadataHandler {
 	 * Register IPC handlers for metadata operations
 	 */
 	private registerHandlers(): void {
-		// Clear all metadata cache
-		ipcMain.handle(`${IpcChannels.METADATA}:${IpcEvents.METADATA_CLEAR_CACHE}`, async () => {
+		registerHandler("metadata:clear-cache", async () => {
 			try {
 				const stats = metadataWriterService.getMetadataStats()
 
-				// Clear all metadata from config
 				configService.set("fileMetadata", {})
 
 				logger.info(`Cleared metadata cache: ${stats.totalFiles} files removed`)
@@ -41,13 +38,11 @@ export class MetadataHandler {
 			}
 		})
 
-		// Get metadata statistics
-		ipcMain.handle(`${IpcChannels.METADATA}:${IpcEvents.METADATA_GET_STATS}`, async () => {
+		registerHandler("metadata:get-stats", async () => {
 			try {
 				const stats = metadataWriterService.getMetadataStats()
 				const allMetadata = metadataWriterService.getAllMetadata()
 
-				// Calculate cache size estimate (rough)
 				const cacheSize = JSON.stringify(allMetadata).length
 				const cacheSizeKB = Math.round(cacheSize / 1024)
 
@@ -76,8 +71,7 @@ export class MetadataHandler {
 			}
 		})
 
-		// Clean up expired metadata only
-		ipcMain.handle(`${IpcChannels.MEDIA}:${IpcEvents.METADATA_CLEANUP_EXPIRED}`, async () => {
+		registerHandler("metadata:cleanup-expired", async () => {
 			try {
 				const cleanedCount = await metadataWriterService.cleanupExpiredMetadata()
 

@@ -6,3 +6,8 @@ out
 *.log*
 .tsbuildinfo-web
 .tsbuildinfo-node
+
+# testing ai generated code
+.agents/
+AGENTS.md
+skills-lock.json

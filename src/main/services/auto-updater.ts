@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { is } from "@electron-toolkit/utils"
-import { IpcChannels } from "@shared/types"
+import type { IpcEvent } from "@shared/ipc"
 import { type BrowserWindow, app, dialog, shell } from "electron"
 import { type UpdateInfo, autoUpdater } from "electron-updater"
 import { logger } from "./logger"
@@ -294,7 +294,8 @@ export class AutoUpdaterService {
 	 */
 	private sendStatusToWindow(status: string, data?: unknown): void {
 		if (this.mainWindow) {
-			this.mainWindow.webContents.send(`${IpcChannels.UPDATE}:${status}`, data)
+			const channel = `update:${status}` as IpcEvent
+			this.mainWindow.webContents.send(channel, data)
 		}
 	}
 

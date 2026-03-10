@@ -12,7 +12,11 @@ declare global {
 				set: (key: string, value: unknown) => Promise<boolean>
 			}
 			metadata: {
-				clearCache: () => Promise<boolean>
+				clearCache: () => Promise<{
+					success: boolean
+					message: string
+					filesRemoved: number
+				}>
 			}
 			vlc: {
 				getConfig: () => Promise<VlcConfig>
@@ -56,7 +60,7 @@ declare global {
 				}>
 				getInstallationType: () => Promise<"portable" | "setup">
 				openCacheFolder: () => Promise<void>
-				onUpdateStatus: (callback: (event: string, data: any) => void) => () => void
+				onUpdateStatus: (callback: (event: string, data: unknown) => void) => () => void
 			}
 		}
 	}

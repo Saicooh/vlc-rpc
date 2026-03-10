@@ -1,9 +1,8 @@
+import { registerHandler } from "@main/ipc"
 import { discordRpcService } from "@main/services/discord-rpc"
 import { logger } from "@main/services/logger"
 import { mediaStateService } from "@main/services/media-state"
 import { vlcStatusService } from "@main/services/vlc-status"
-import { IpcChannels, IpcEvents } from "@shared/types"
-import { ipcMain } from "electron"
 
 /**
  * Handler for Discord RPC operations
@@ -15,64 +14,57 @@ export class DiscordRpcHandler {
 	private maxFastChecks = 5
 
 	constructor() {
-		this.registerIpcHandlers()
+		this.registerHandlers()
 	}
 
-	/**
-	 * Register IPC handlers for Discord RPC
-	 */
-	private registerIpcHandlers(): void {
-		ipcMain.handle(`${IpcChannels.DISCORD}:connect`, async () => {
+	private registerHandlers(): void {
+		registerHandler("discord:connect", async () => {
 			return await discordRpcService.connect()
 		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:disconnect`, async () => {
+		registerHandler("discord:disconnect", async () => {
 			await discordRpcService.close()
 			return true
 		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:status`, () => {
+		registerHandler("discord:status", () => {
 			return discordRpcService.isConnected()
 		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:update`, async () => {
+		registerHandler("discord:update", async () => {
 			return await this.updatePresence(true)
 		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:start-loop`, async () => {
+		registerHandler("discord:start-loop", async () => {
 			return this.startUpdateLoop()
 		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:stop-loop`, () => {
+		registerHandler("discord:stop-loop", () => {
 			this.stopUpdateLoop()
 			return true
 		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:reconnect`, async () => {
+		registerHandler("discord:reconnect", async () => {
 			logger.info("Forcing Discord reconnection")
 			return await discordRpcService.forceReconnect()
 		})
 
-		// New RPC control handlers
-		ipcMain.handle(`${IpcChannels.DISCORD}:${IpcEvents.RPC_ENABLE}`, () => {
+		registerHandler("discord:rpc:enable", () => {
 			discordRpcService.enableRpc()
 			return true
 		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:${IpcEvents.RPC_DISABLE}`, () => {
+		registerHandler("discord:rpc:disable", () => {
 			discordRpcService.disableRpc()
 			return true
 		})
 
-		ipcMain.handle(
-			`${IpcChannels.DISCORD}:${IpcEvents.RPC_DISABLE_TEMPORARY}`,
-			(_, minutes: number) => {
-				discordRpcService.disableRpcTemporary(minutes)
-				return true
-			},
-		)
+		registerHandler("discord:rpc:disable:temporary", (minutes) => {
+			discordRpcService.disableRpcTemporary(minutes)
+			return true
+		})
 
-		ipcMain.handle(`${IpcChannels.DISCORD}:${IpcEvents.RPC_STATUS}`, () => {
+		registerHandler("discord:rpc:status", () => {
 			return discordRpcService.isRpcEnabled()
 		})
 	}

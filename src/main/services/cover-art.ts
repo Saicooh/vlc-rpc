@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs"
-import { multiImageUploaderService } from "@main/services/multi-image-uploader"
 import { metadataWriterService } from "@main/services/metadata-writer"
+import { multiImageUploaderService } from "@main/services/multi-image-uploader"
 import { VideoAnalyzerService } from "@main/services/video-analyzer"
 import { vlcStatusService } from "@main/services/vlc-status"
 import type { VlcStatus } from "@shared/types/vlc"
@@ -77,7 +77,11 @@ export class CoverArtService {
 				try {
 					const imageBuffer = await fs.readFile(fixedPath)
 					const filename = `cover_${Date.now()}.jpg`
-					const uploadedUrl = await multiImageUploaderService.uploadImage(imageBuffer, filename, 24 * 7) // 7 days
+					const uploadedUrl = await multiImageUploaderService.uploadImage(
+						imageBuffer,
+						filename,
+						24 * 7,
+					) // 7 days
 
 					if (uploadedUrl && fileUri) {
 						// Store the uploaded URL in metadata for future use

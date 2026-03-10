@@ -1,6 +1,6 @@
+import { registerHandler } from "@main/ipc"
 import { CONFIG_NAME, DEFAULT_CONFIG } from "@shared/constants"
-import { type AppConfig, IpcChannels, IpcEvents } from "@shared/types"
-import { ipcMain } from "electron"
+import type { AppConfig } from "@shared/types"
 import { Conf } from "electron-conf/main"
 import { logger } from "./logger"
 
@@ -37,22 +37,18 @@ class ConfigService {
 	 * Register IPC handlers for config operations
 	 */
 	private registerIpcHandlers(): void {
-		ipcMain.handle(`${IpcChannels.CONFIG}:${IpcEvents.CONFIG_GET}`, (_, key?: string) => {
+		registerHandler("config:get", (key?) => {
 			if (key) {
 				return this.conf.get(key)
 			}
-			// When no key is provided, return the full config using the store property
 			return this.conf.store
 		})
 
-		ipcMain.handle(
-			`${IpcChannels.CONFIG}:${IpcEvents.CONFIG_SET}`,
-			(_, key: string, value: unknown) => {
-				this.conf.set(key, value)
-				logger.info(`Config updated: ${key}`, { value })
-				return true
-			},
-		)
+		registerHandler("config:set", (key, value) => {
+			this.conf.set(key, value)
+			logger.info(`Config updated: ${key}`, { value })
+			return true
+		})
 	}
 
 	/**

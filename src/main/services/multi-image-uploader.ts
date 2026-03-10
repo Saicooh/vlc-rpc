@@ -1,356 +1,362 @@
 import { logger } from "@main/services/logger"
 
 interface ImageUploadService {
-    name: string
-    upload: (imageBuffer: Buffer, filename: string, expiryHours?: number) => Promise<string | null>
-    maxFileSize: number
-    supportsExpiry: boolean
+	name: string
+	upload: (imageBuffer: Buffer, filename: string, expiryHours?: number) => Promise<string | null>
+	maxFileSize: number
+	supportsExpiry: boolean
 }
 
 export class MultiImageUploaderService {
-    private static instance: MultiImageUploaderService | null = null
-    private readonly appVersion = "4.0.2"
-    private readonly appName = "VLC-Discord-RPC"
-    
-    private readonly userAgents = [
-        "curl/8.13.0",
-        "PostmanRuntime/7.32.0",
-        "Wget/1.21.3",
-        "HTTPie/3.2.2",
-        "insomnia/2023.5.8",
-        "Python-urllib/3.11"
-    ]
-    
-    private currentUserAgentIndex = 0
-    
-    private readonly services: ImageUploadService[] = [
-        {
-            name: "x0.at",
-            upload: this.uploadToX0At.bind(this),
-            maxFileSize: 512 * 1024 * 1024,
-            supportsExpiry: false
-        },
-        {
-            name: "catbox.moe",
-            upload: this.uploadToCatbox.bind(this),
-            maxFileSize: 200 * 1024 * 1024,
-            supportsExpiry: false
-        },
-        {
-            name: "uguu.se",
-            upload: this.uploadToUguu.bind(this),
-            maxFileSize: 128 * 1024 * 1024,
-            supportsExpiry: false
-        },
-        {
-            name: "0x0.st",
-            upload: this.uploadTo0x0st.bind(this),
-            maxFileSize: 512 * 1024 * 1024,
-            supportsExpiry: true
-        },
-        {
-            name: "tmpfiles.org",
-            upload: this.uploadToTmpFiles.bind(this),
-            maxFileSize: 100 * 1024 * 1024,
-            supportsExpiry: false
-        }
-    ]
+	private static instance: MultiImageUploaderService | null = null
+	private readonly appVersion = "4.0.2"
+	private readonly appName = "VLC-Discord-RPC"
 
-    private constructor() {
-        logger.info("Multi-service image uploader initialized")
-        this.shuffleUserAgents()
-    }
+	private readonly userAgents = [
+		"curl/8.13.0",
+		"PostmanRuntime/7.32.0",
+		"Wget/1.21.3",
+		"HTTPie/3.2.2",
+		"insomnia/2023.5.8",
+		"Python-urllib/3.11",
+	]
 
-    public static getInstance(): MultiImageUploaderService {
-        if (!MultiImageUploaderService.instance) {
-            MultiImageUploaderService.instance = new MultiImageUploaderService()
-        }
-        return MultiImageUploaderService.instance
-    }
+	private currentUserAgentIndex = 0
 
-    public async uploadImage(
-        imageBuffer: Buffer,
-        filename: string,
-        expiryHours = 24
-    ): Promise<string | null> {
-        const fileSize = imageBuffer.length
-        logger.info(`Starting multi-service upload: ${filename} (${fileSize} bytes)`)
+	private readonly services: ImageUploadService[] = [
+		{
+			name: "x0.at",
+			upload: this.uploadToX0At.bind(this),
+			maxFileSize: 512 * 1024 * 1024,
+			supportsExpiry: false,
+		},
+		{
+			name: "catbox.moe",
+			upload: this.uploadToCatbox.bind(this),
+			maxFileSize: 200 * 1024 * 1024,
+			supportsExpiry: false,
+		},
+		{
+			name: "uguu.se",
+			upload: this.uploadToUguu.bind(this),
+			maxFileSize: 128 * 1024 * 1024,
+			supportsExpiry: false,
+		},
+		{
+			name: "0x0.st",
+			upload: this.uploadTo0x0st.bind(this),
+			maxFileSize: 512 * 1024 * 1024,
+			supportsExpiry: true,
+		},
+		{
+			name: "tmpfiles.org",
+			upload: this.uploadToTmpFiles.bind(this),
+			maxFileSize: 100 * 1024 * 1024,
+			supportsExpiry: false,
+		},
+	]
 
-        for (const service of this.services) {
-            if (fileSize > service.maxFileSize) {
-                logger.warn(`Skipping ${service.name}: file too large (${fileSize} > ${service.maxFileSize})`)
-                continue
-            }
+	private constructor() {
+		logger.info("Multi-service image uploader initialized")
+		this.shuffleUserAgents()
+	}
 
-            try {
-                logger.info(`Attempting upload to ${service.name}`)
-                
-                const result = await service.upload(imageBuffer, filename, expiryHours)
-                
-                if (result) {
-                    logger.info(`Successfully uploaded to ${service.name}: ${result}`)
-                    return result
-                }
-                
-                logger.warn(`Upload to ${service.name} returned null`)
-            } catch (error) {
-                logger.error(`Upload to ${service.name} failed: ${error}`)
-            }
+	public static getInstance(): MultiImageUploaderService {
+		if (!MultiImageUploaderService.instance) {
+			MultiImageUploaderService.instance = new MultiImageUploaderService()
+		}
+		return MultiImageUploaderService.instance
+	}
 
-            this.rotateUserAgent()
-        }
+	public async uploadImage(
+		imageBuffer: Buffer,
+		filename: string,
+		expiryHours = 24,
+	): Promise<string | null> {
+		const fileSize = imageBuffer.length
+		logger.info(`Starting multi-service upload: ${filename} (${fileSize} bytes)`)
 
-        logger.error("All upload services failed")
-        return null
-    }
+		for (const service of this.services) {
+			if (fileSize > service.maxFileSize) {
+				logger.warn(
+					`Skipping ${service.name}: file too large (${fileSize} > ${service.maxFileSize})`,
+				)
+				continue
+			}
 
-    public async uploadImageFromUrl(imageUrl: string, expiryHours = 24): Promise<string | null> {
-        logger.info(`Starting multi-service URL upload: ${imageUrl}`)
+			try {
+				logger.info(`Attempting upload to ${service.name}`)
 
-        try {
-            const response = await fetch(imageUrl, {
-                headers: {
-                    "User-Agent": this.getCurrentUserAgent(),
-                },
-            })
+				const result = await service.upload(imageBuffer, filename, expiryHours)
 
-            if (!response.ok) {
-                logger.error(`Failed to download image from URL: ${response.status}`)
-                return null
-            }
+				if (result) {
+					logger.info(`Successfully uploaded to ${service.name}: ${result}`)
+					return result
+				}
 
-            const imageBuffer = Buffer.from(await response.arrayBuffer())
-            const filename = `cover_${Date.now()}.jpg`
+				logger.warn(`Upload to ${service.name} returned null`)
+			} catch (error) {
+				logger.error(`Upload to ${service.name} failed: ${error}`)
+			}
 
-            return await this.uploadImage(imageBuffer, filename, expiryHours)
-        } catch (error) {
-            logger.error(`Error downloading image from URL: ${error}`)
-            return null
-        }
-    }
+			this.rotateUserAgent()
+		}
 
-    private getCurrentUserAgent(): string {
-        return this.userAgents[this.currentUserAgentIndex]
-    }
+		logger.error("All upload services failed")
+		return null
+	}
 
-    private rotateUserAgent(): void {
-        this.currentUserAgentIndex = (this.currentUserAgentIndex + 1) % this.userAgents.length
-    }
+	public async uploadImageFromUrl(imageUrl: string, expiryHours = 24): Promise<string | null> {
+		logger.info(`Starting multi-service URL upload: ${imageUrl}`)
 
-    private shuffleUserAgents(): void {
-        for (let i = this.userAgents.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1))
-            ;[this.userAgents[i], this.userAgents[j]] = [this.userAgents[j], this.userAgents[i]]
-        }
-        logger.info(`User agents shuffled, starting with: ${this.userAgents[0]}`)
-    }
+		try {
+			const response = await fetch(imageUrl, {
+				headers: {
+					"User-Agent": this.getCurrentUserAgent(),
+				},
+			})
 
-    private async uploadToX0At(imageBuffer: Buffer, filename: string): Promise<string | null> {
-        const formData = new FormData()
-        
-        const uint8Array = new Uint8Array(imageBuffer)
-        const blob = new Blob([uint8Array], {
-            type: this.getMimeType(filename),
-        })
+			if (!response.ok) {
+				logger.error(`Failed to download image from URL: ${response.status}`)
+				return null
+			}
 
-        formData.append("file", blob, filename)
+			const imageBuffer = Buffer.from(await response.arrayBuffer())
+			const filename = `cover_${Date.now()}.jpg`
 
-        const response = await fetch("https://x0.at/", {
-            method: "POST",
-            body: formData,
-            headers: {
-                "User-Agent": this.getCurrentUserAgent(),
-            },
-        })
+			return await this.uploadImage(imageBuffer, filename, expiryHours)
+		} catch (error) {
+			logger.error(`Error downloading image from URL: ${error}`)
+			return null
+		}
+	}
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
-        }
+	private getCurrentUserAgent(): string {
+		return this.userAgents[this.currentUserAgentIndex]
+	}
 
-        const result = await response.text()
-        return result.trim().startsWith("http") ? result.trim() : null
-    }
+	private rotateUserAgent(): void {
+		this.currentUserAgentIndex = (this.currentUserAgentIndex + 1) % this.userAgents.length
+	}
 
-    private async uploadToCatbox(imageBuffer: Buffer, filename: string): Promise<string | null> {
-        const formData = new FormData()
-        
-        const uint8Array = new Uint8Array(imageBuffer)
-        const blob = new Blob([uint8Array], {
-            type: this.getMimeType(filename),
-        })
+	private shuffleUserAgents(): void {
+		for (let i = this.userAgents.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1))
+			;[this.userAgents[i], this.userAgents[j]] = [this.userAgents[j], this.userAgents[i]]
+		}
+		logger.info(`User agents shuffled, starting with: ${this.userAgents[0]}`)
+	}
 
-        formData.append("reqtype", "fileupload")
-        formData.append("fileToUpload", blob, filename)
+	private async uploadToX0At(imageBuffer: Buffer, filename: string): Promise<string | null> {
+		const formData = new FormData()
 
-        const response = await fetch("https://catbox.moe/user/api.php", {
-            method: "POST",
-            body: formData,
-            headers: {
-                "User-Agent": this.getCurrentUserAgent(),
-            },
-        })
+		const uint8Array = new Uint8Array(imageBuffer)
+		const blob = new Blob([uint8Array], {
+			type: this.getMimeType(filename),
+		})
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
-        }
+		formData.append("file", blob, filename)
 
-        const result = await response.text()
-        return result.trim().startsWith("http") ? result.trim() : null
-    }
+		const response = await fetch("https://x0.at/", {
+			method: "POST",
+			body: formData,
+			headers: {
+				"User-Agent": this.getCurrentUserAgent(),
+			},
+		})
 
-    private async uploadToUguu(imageBuffer: Buffer, filename: string): Promise<string | null> {
-        const formData = new FormData()
-        
-        const uint8Array = new Uint8Array(imageBuffer)
-        const blob = new Blob([uint8Array], {
-            type: this.getMimeType(filename),
-        })
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`)
+		}
 
-        formData.append("files[]", blob, filename)
+		const result = await response.text()
+		return result.trim().startsWith("http") ? result.trim() : null
+	}
 
-        const response = await fetch("https://uguu.se/upload", {
-            method: "POST",
-            body: formData,
-            headers: {
-                "User-Agent": this.getCurrentUserAgent(),
-            },
-        })
+	private async uploadToCatbox(imageBuffer: Buffer, filename: string): Promise<string | null> {
+		const formData = new FormData()
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
-        }
+		const uint8Array = new Uint8Array(imageBuffer)
+		const blob = new Blob([uint8Array], {
+			type: this.getMimeType(filename),
+		})
 
-        const result = await response.json()
-        
-        if (result.success && result.files && result.files.length > 0) {
-            return result.files[0].url
-        }
-        
-        return null
-    }
+		formData.append("reqtype", "fileupload")
+		formData.append("fileToUpload", blob, filename)
 
-    private async uploadTo0x0st(imageBuffer: Buffer, filename: string, expiryHours = 24): Promise<string | null> {
-        const formData = new FormData()
-        
-        const uint8Array = new Uint8Array(imageBuffer)
-        const blob = new Blob([uint8Array], {
-            type: this.getMimeType(filename),
-        })
+		const response = await fetch("https://catbox.moe/user/api.php", {
+			method: "POST",
+			body: formData,
+			headers: {
+				"User-Agent": this.getCurrentUserAgent(),
+			},
+		})
 
-        formData.append("file", blob, filename)
-        formData.append("expires", expiryHours.toString())
-        formData.append("secret", "")
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`)
+		}
 
-        const response = await fetch("https://0x0.st", {
-            method: "POST",
-            body: formData,
-            headers: {
-                "User-Agent": this.getCurrentUserAgent(),
-            },
-        })
+		const result = await response.text()
+		return result.trim().startsWith("http") ? result.trim() : null
+	}
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
-        }
+	private async uploadToUguu(imageBuffer: Buffer, filename: string): Promise<string | null> {
+		const formData = new FormData()
 
-        const result = await response.text()
-        return result.trim().startsWith("http") ? result.trim() : null
-    }
+		const uint8Array = new Uint8Array(imageBuffer)
+		const blob = new Blob([uint8Array], {
+			type: this.getMimeType(filename),
+		})
 
-    private async uploadToTmpFiles(imageBuffer: Buffer, filename: string): Promise<string | null> {
-        const formData = new FormData()
-        
-        const uint8Array = new Uint8Array(imageBuffer)
-        const blob = new Blob([uint8Array], {
-            type: this.getMimeType(filename),
-        })
+		formData.append("files[]", blob, filename)
 
-        formData.append("file", blob, filename)
+		const response = await fetch("https://uguu.se/upload", {
+			method: "POST",
+			body: formData,
+			headers: {
+				"User-Agent": this.getCurrentUserAgent(),
+			},
+		})
 
-        const response = await fetch("https://tmpfiles.org/api/v1/upload", {
-            method: "POST",
-            body: formData,
-            headers: {
-                "User-Agent": this.getCurrentUserAgent(),
-            },
-        })
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`)
+		}
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
-        }
+		const result = await response.json()
 
-        const result = await response.json()
-        
-        if (result.status === "success" && result.data && result.data.url) {
-            const url = result.data.url
-            return url.replace("http://tmpfiles.org/", "https://tmpfiles.org/dl/")
-        }
-        
-        return null
-    }
+		if (result.success && result.files && result.files.length > 0) {
+			return result.files[0].url
+		}
 
-    private getMimeType(filename: string): string {
-        const ext = filename.toLowerCase().split(".").pop()
+		return null
+	}
 
-        switch (ext) {
-            case "jpg":
-            case "jpeg":
-                return "image/jpeg"
-            case "png":
-                return "image/png"
-            case "gif":
-                return "image/gif"
-            case "webp":
-                return "image/webp"
-            case "bmp":
-                return "image/bmp"
-            default:
-                return "image/jpeg"
-        }
-    }
+	private async uploadTo0x0st(
+		imageBuffer: Buffer,
+		filename: string,
+		expiryHours = 24,
+	): Promise<string | null> {
+		const formData = new FormData()
 
-    public generateMetadataTags(imageUrl: string, expiryDate?: Date): Record<string, string> {
-        const tags: Record<string, string> = {
-            "X-COVER-URL": imageUrl,
-            "X-APP-VERSION": this.appVersion,
-            "X-PROCESSED-BY": this.appName,
-        }
+		const uint8Array = new Uint8Array(imageBuffer)
+		const blob = new Blob([uint8Array], {
+			type: this.getMimeType(filename),
+		})
 
-        if (expiryDate) {
-            tags["X-EXPIRY-DATE"] = expiryDate.toISOString()
-        }
+		formData.append("file", blob, filename)
+		formData.append("expires", expiryHours.toString())
+		formData.append("secret", "")
 
-        return tags
-    }
+		const response = await fetch("https://0x0.st", {
+			method: "POST",
+			body: formData,
+			headers: {
+				"User-Agent": this.getCurrentUserAgent(),
+			},
+		})
 
-    public parseMetadataTags(metadata: Record<string, string | undefined>): {
-        imageUrl: string | null
-        isExpired: boolean
-        appVersion: string | null
-        processedBy: string | null
-    } {
-        const imageUrl = metadata["X-COVER-URL"] || null
-        const appVersion = metadata["X-APP-VERSION"] || null
-        const processedBy = metadata["X-PROCESSED-BY"] || null
-        const expiryDateStr = metadata["X-EXPIRY-DATE"]
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`)
+		}
 
-        let isExpired = false
-        if (expiryDateStr) {
-            try {
-                const expiryDate = new Date(expiryDateStr)
-                isExpired = expiryDate.getTime() < Date.now()
-            } catch (error) {
-                logger.warn(`Invalid expiry date format: ${expiryDateStr}`)
-            }
-        }
+		const result = await response.text()
+		return result.trim().startsWith("http") ? result.trim() : null
+	}
 
-        return {
-            imageUrl,
-            isExpired,
-            appVersion,
-            processedBy,
-        }
-    }
+	private async uploadToTmpFiles(imageBuffer: Buffer, filename: string): Promise<string | null> {
+		const formData = new FormData()
+
+		const uint8Array = new Uint8Array(imageBuffer)
+		const blob = new Blob([uint8Array], {
+			type: this.getMimeType(filename),
+		})
+
+		formData.append("file", blob, filename)
+
+		const response = await fetch("https://tmpfiles.org/api/v1/upload", {
+			method: "POST",
+			body: formData,
+			headers: {
+				"User-Agent": this.getCurrentUserAgent(),
+			},
+		})
+
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`)
+		}
+
+		const result = await response.json()
+
+		if (result.status === "success" && result.data && result.data.url) {
+			const url = result.data.url
+			return url.replace("http://tmpfiles.org/", "https://tmpfiles.org/dl/")
+		}
+
+		return null
+	}
+
+	private getMimeType(filename: string): string {
+		const ext = filename.toLowerCase().split(".").pop()
+
+		switch (ext) {
+			case "jpg":
+			case "jpeg":
+				return "image/jpeg"
+			case "png":
+				return "image/png"
+			case "gif":
+				return "image/gif"
+			case "webp":
+				return "image/webp"
+			case "bmp":
+				return "image/bmp"
+			default:
+				return "image/jpeg"
+		}
+	}
+
+	public generateMetadataTags(imageUrl: string, expiryDate?: Date): Record<string, string> {
+		const tags: Record<string, string> = {
+			"X-COVER-URL": imageUrl,
+			"X-APP-VERSION": this.appVersion,
+			"X-PROCESSED-BY": this.appName,
+		}
+
+		if (expiryDate) {
+			tags["X-EXPIRY-DATE"] = expiryDate.toISOString()
+		}
+
+		return tags
+	}
+
+	public parseMetadataTags(metadata: Record<string, string | undefined>): {
+		imageUrl: string | null
+		isExpired: boolean
+		appVersion: string | null
+		processedBy: string | null
+	} {
+		const imageUrl = metadata["X-COVER-URL"] || null
+		const appVersion = metadata["X-APP-VERSION"] || null
+		const processedBy = metadata["X-PROCESSED-BY"] || null
+		const expiryDateStr = metadata["X-EXPIRY-DATE"]
+
+		let isExpired = false
+		if (expiryDateStr) {
+			try {
+				const expiryDate = new Date(expiryDateStr)
+				isExpired = expiryDate.getTime() < Date.now()
+			} catch (error) {
+				logger.warn(`Invalid expiry date format: ${expiryDateStr}`)
+			}
+		}
+
+		return {
+			imageUrl,
+			isExpired,
+			appVersion,
+			processedBy,
+		}
+	}
 }
 
 export const multiImageUploaderService = MultiImageUploaderService.getInstance()

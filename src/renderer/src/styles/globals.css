@@ -1,4 +1,4 @@
-@import '@fontsource-variable/inter';
+@import "@fontsource-variable/inter";
 @import "tailwindcss";
 
 @theme {
@@ -142,7 +142,6 @@
 	body {
 		@apply overscroll-y-none bg-background text-foreground font-sans antialiased;
 	}
-	
 }
 
 /* Discord-style focus rings */
@@ -167,9 +166,6 @@
 	}
 }
 
-
 @utility no-scrollbar {
 	@apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
 }
-
-

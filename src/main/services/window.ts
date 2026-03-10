@@ -1,5 +1,6 @@
 import { join } from "node:path"
 import { is } from "@electron-toolkit/utils"
+import { registerHandler } from "@main/ipc"
 import { BrowserWindow, app, ipcMain, session, shell } from "electron"
 import { configService } from "./config"
 import { discordRpcService } from "./discord-rpc"
@@ -31,27 +32,30 @@ export class WindowService {
 	 * Register IPC handlers for window controls
 	 */
 	private registerIpcHandlers(): void {
-		ipcMain.handle("window:minimize", () => {
+		registerHandler("window:minimize", () => {
 			this.mainWindow?.minimize()
+			return undefined
 		})
 
-		ipcMain.handle("window:maximize", () => {
+		registerHandler("window:maximize", () => {
 			if (this.mainWindow?.isMaximized()) {
 				this.mainWindow.unmaximize()
 			} else {
 				this.mainWindow?.maximize()
 			}
+			return undefined
 		})
 
-		ipcMain.handle("window:close", () => {
+		registerHandler("window:close", () => {
 			this.mainWindow?.close()
+			return undefined
 		})
 
-		ipcMain.handle("window:isMaximized", () => {
+		registerHandler("window:is-maximized", () => {
 			return this.mainWindow?.isMaximized() || false
 		})
 
-		ipcMain.handle("system:platform", () => {
+		registerHandler("system:platform", () => {
 			return process.platform
 		})
 
