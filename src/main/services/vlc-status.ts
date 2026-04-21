@@ -262,6 +262,8 @@ export class VlcStatusService {
 
 		// Media information extraction
 		if (meta) {
+			status.media.filename = meta.filename || ""
+
 			// Prioritize specific metadata fields over generic ones
 			status.media.title =
 				meta.title ||

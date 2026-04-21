@@ -7,6 +7,15 @@ import type { VlcStatus } from "@shared/types/vlc"
 import * as cheerio from "cheerio"
 import { logger } from "./logger"
 
+
+
+/** Cached video cover entry */
+interface CachedVideoCover {
+	url: string | null
+	timestamp: number
+	ttl: number
+}
+
 /** Media data structure for cover art searching */
 interface MediaData {
 	title?: string
@@ -21,6 +30,11 @@ interface MediaData {
 /** Service to fetch album cover art for audio files */
 export class CoverArtService {
 	private static instance: CoverArtService | null = null
+
+	/** In-memory cache for video covers to avoid repeated API calls on each poll cycle */
+	private videoCoverCache: Map<string, CachedVideoCover> = new Map()
+	private readonly videoCoverCacheTtl = 10 * 60 // 10 minutes in seconds
+	private readonly videoCoverMissTtl = 30 // 30 seconds for transient failures
 
 	private constructor() {
 		logger.info("Cover art service initialized")
@@ -111,8 +125,8 @@ export class CoverArtService {
 	}
 
 	/**
-	 * Fetch cover art for video content using Google Images
-	 * Only works for videos, not audio
+	 * Fetch cover art for video content
+	 * Uses Jikan API (MyAnimeList) as primary source, Google Images as fallback
 	 */
 	public async fetchVideoImageFromGoogle(mediaInfo: VlcStatus | null): Promise<string | null> {
 		if (!mediaInfo || mediaInfo.mediaType !== "video") {
@@ -122,26 +136,50 @@ export class CoverArtService {
 		try {
 			const videoAnalyzer = VideoAnalyzerService.getInstance()
 			const videoAnalysis = videoAnalyzer.analyzeVideo(mediaInfo)
+			const title = videoAnalysis.title
 
-			let searchTerm = ""
-
-			if (videoAnalysis.isTvShow) {
-				// For TV shows, search for the show poster
-				searchTerm = `${videoAnalysis.title} tv show poster`
-			} else if (videoAnalysis.isMovie) {
-				// For movies, include year if available
-				if (videoAnalysis.year) {
-					searchTerm = `${videoAnalysis.title} ${videoAnalysis.year} movie poster`
-				} else {
-					searchTerm = `${videoAnalysis.title} movie poster`
-				}
-			} else {
-				// Generic video search
-				searchTerm = `${videoAnalysis.title} cover`
+			if (!title || title === "Unknown") {
+				logger.warn("No valid title for video cover art search")
+				return null
 			}
 
-			logger.info(`Searching for video cover: ${searchTerm}`)
-			return await this.fetchImageFromGoogle(searchTerm)
+			// Check in-memory cache first
+			const cacheKey = title.toLowerCase().trim()
+			const cached = this.videoCoverCache.get(cacheKey)
+			if (cached) {
+				const age = Math.floor(Date.now() / 1000) - cached.timestamp
+				if (age < cached.ttl) {
+					logger.info(`Using cached video cover for "${title}" (age: ${age}s)`)
+					return cached.url
+				}
+				// Cache expired, remove it
+				this.videoCoverCache.delete(cacheKey)
+			}
+
+			// We always try AniList first because it provides the best anime/show covers.
+			// If it's a Hollywood movie, AniList will safely return no results and we'll fall back to Google.
+			const anilistCover = await this.fetchVideoCoverFromAnilist(title)
+			if (anilistCover) {
+				this.cacheVideoCover(cacheKey, anilistCover)
+				return anilistCover
+			}
+
+			// Step 2: Fallback to Google Images scraping
+			let searchTerm = ""
+			if (videoAnalysis.isTvShow) {
+				searchTerm = `${title} tv show poster`
+			} else if (videoAnalysis.isMovie) {
+				searchTerm = videoAnalysis.year
+					? `${title} ${videoAnalysis.year} movie poster`
+					: `${title} movie poster`
+			} else {
+				searchTerm = `${title} cover`
+			}
+
+			logger.info(`Jikan returned no results, falling back to Google for: ${searchTerm}`)
+			const googleResult = await this.fetchImageFromGoogle(searchTerm)
+			this.cacheVideoCover(cacheKey, googleResult)
+			return googleResult
 		} catch (error) {
 			logger.error(`Error fetching video cover art: ${error}`)
 			return null
@@ -149,20 +187,120 @@ export class CoverArtService {
 	}
 
 	/**
-	 * Fetch image from Google Images based on search term
+	 * Fetch cover art from AniList API (GraphQL)
+	 * Better search relevancy for aliases than Jikan and images load properly in Discord.
+	 * Rate limit: 90 req / minute
+	 * @param title - The anime/show title to search for
+	 * @returns Image URL from AniList CDN or null
+	 */
+	private async fetchVideoCoverFromAnilist(title: string): Promise<string | null> {
+		try {
+			logger.info(`Searching AniList API for: "${title}"`)
+
+			const query = `
+			query ($search: String) {
+			  Media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
+				id
+				title { romaji english native }
+				coverImage { extraLarge large }
+			  }
+			}`
+
+			const controller = new AbortController()
+			const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+			const response = await fetch("https://graphql.anilist.co", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Accept: "application/json",
+				},
+				body: JSON.stringify({
+					query,
+					variables: { search: title },
+				}),
+				signal: controller.signal,
+			})
+
+			clearTimeout(timeoutId)
+
+			if (!response.ok) {
+				if (response.status === 429) {
+					logger.warn("AniList API rate limited, will retry on next cycle")
+				} else {
+					logger.warn(`AniList API returned status: ${response.status}`)
+				}
+				return null
+			}
+
+			const data = await response.json()
+			const media = data?.data?.Media
+
+			if (!media || !media.coverImage) {
+				logger.info(`No AniList results found for: "${title}"`)
+				return null
+			}
+
+			const imageUrl = media.coverImage.extraLarge || media.coverImage.large
+			if (imageUrl) {
+				logger.info(
+					`Found AniList cover for "${title}": ${media.title.romaji || media.title.english} (AniList ID: ${media.id})`,
+				)
+				return imageUrl
+			}
+
+			return null
+		} catch (error: unknown) {
+			const err = error as Error
+			if (err.name === "AbortError") {
+				logger.warn("AniList request timed out")
+			} else {
+				logger.error(`Error fetching video cover from AniList: ${error}`)
+			}
+			return null
+		}
+	}
+
+	/**
+	 * Cache a video cover result in memory
+	 */
+	private cacheVideoCover(key: string, url: string | null): void {
+		this.videoCoverCache.set(key, {
+			url,
+			timestamp: Math.floor(Date.now() / 1000),
+			ttl: url ? this.videoCoverCacheTtl : this.videoCoverMissTtl,
+		})
+
+		// Limit cache size to prevent memory leaks
+		if (this.videoCoverCache.size > 50) {
+			const oldestKey = this.videoCoverCache.keys().next().value
+			if (oldestKey) {
+				this.videoCoverCache.delete(oldestKey)
+			}
+		}
+	}
+
+	/**
+	 * Fetch image from Google Images based on search term (fallback)
 	 */
 	private async fetchImageFromGoogle(searchTerm: string): Promise<string | null> {
 		try {
-			logger.info(`Searching for image: ${searchTerm}`)
+			logger.info(`Searching Google Images for: ${searchTerm}`)
 			const encodedQuery = encodeURIComponent(searchTerm)
 			const searchUrl = `https://www.google.com/search?q=${encodedQuery}&tbm=isch`
+
+			const controller = new AbortController()
+			const timeoutId = setTimeout(() => controller.abort(), 5000)
 
 			const response = await fetch(searchUrl, {
 				headers: {
 					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 					Accept: "text/html,application/xhtml+xml",
 				},
+				signal: controller.signal,
 			})
+
+			clearTimeout(timeoutId)
 
 			if (!response.ok) {
 				logger.warn(`Google search failed with status: ${response.status}`)
@@ -217,8 +355,13 @@ export class CoverArtService {
 
 			logger.warn(`No suitable image found for: ${searchTerm}`)
 			return null
-		} catch (error) {
-			logger.error(`Error fetching image from Google: ${error}`)
+		} catch (error: unknown) {
+			const err = error as Error
+			if (err.name === "AbortError") {
+				logger.warn("Google Images request timed out")
+			} else {
+				logger.error(`Error fetching image from Google: ${error}`)
+			}
 			return null
 		}
 	}

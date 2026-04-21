@@ -132,6 +132,7 @@ export interface VlcStatus {
 	mediaType: "video" | "audio"
 	media: {
 		title?: string
+		filename?: string
 		artist?: string
 		album?: string
 		artworkUrl?: string
