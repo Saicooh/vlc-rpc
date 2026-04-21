@@ -253,6 +253,24 @@ class PausedState extends MediaState {
 		let largeImage = config.largeImage
 		let largeText = "VLC Media Player"
 
+		let startTimestamp: number | undefined
+		let endTimestamp: number | undefined
+
+		const playback = mediaInfo.playback
+		const currentTime = Math.floor(Date.now() / 1000)
+
+		if (playback) {
+			const duration = playback.duration
+			const position = playback.time
+
+			if (position >= 0 && duration > 0 && duration < 86400) {
+				startTimestamp = currentTime - position
+				endTimestamp = currentTime + (duration - position)
+			} else {
+				startTimestamp = currentTime
+			}
+		}
+
 		// Use artwork from VLC if available
 		if (media.artworkUrl) {
 			largeImage = media.artworkUrl
@@ -295,6 +313,8 @@ class PausedState extends MediaState {
 			large_text: largeText,
 			small_image: config.pausedImage,
 			small_text: smallText,
+			start_timestamp: startTimestamp,
+			end_timestamp: endTimestamp,
 			activity_type: activityType,
 		}
 
