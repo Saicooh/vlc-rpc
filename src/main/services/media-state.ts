@@ -6,6 +6,7 @@ import { ActivityType } from "discord-api-types/v10"
 import { configService } from "./config"
 import { coverArtService } from "./cover-art"
 import { logger } from "./logger"
+import { syncplayDetector } from "./syncplay-detector"
 import { VideoAnalyzerService } from "./video-analyzer"
 
 /**
@@ -134,12 +135,16 @@ class PlayingState extends MediaState {
 			largeImage = media.artworkUrl
 		}
 
+		// Detect Syncplay and set appropriate large text
+		const isSyncplay = await syncplayDetector.isRunning()
+
 		// Set appropriate large text based on media type
 		if (activityType === ActivityType.Listening) {
-			// Use album name if available, otherwise fallback to "Listening to Music"
 			largeText = media.album || "Listening to Music"
 		} else {
-			largeText = "Watching Video"
+			const videoAnalyzerForText = VideoAnalyzerService.getInstance()
+			const videoAnalysisForText = videoAnalyzerForText.analyzeVideo(mediaInfo)
+			largeText = videoAnalyzerForText.getLargeText(videoAnalysisForText)
 		}
 
 		const videoInfo = detectedInfo.videoInfo
@@ -164,13 +169,19 @@ class PlayingState extends MediaState {
 			}
 		}
 
+		// Override small icon with Syncplay logo when active
+		const smallImage = isSyncplay
+			? "https://raw.githubusercontent.com/Syncplay/syncplay/master/syncplay/resources/syncplay.png"
+			: config.playingImage
+		const smallImageText = isSyncplay ? "Watching Together" : smallText
+
 		const presenceData: DiscordPresenceData = {
 			details,
 			state,
 			large_image: largeImage,
 			large_text: largeText,
-			small_image: config.playingImage,
-			small_text: smallText,
+			small_image: smallImage,
+			small_text: smallImageText,
 			start_timestamp: startTimestamp,
 			end_timestamp: endTimestamp,
 			activity_type: activityType,
@@ -276,12 +287,16 @@ class PausedState extends MediaState {
 			largeImage = media.artworkUrl
 		}
 
+		// Detect Syncplay and set appropriate large text
+		const isSyncplay = await syncplayDetector.isRunning()
+
 		// Set appropriate large text based on media type
 		if (activityType === ActivityType.Listening) {
-			// Use album name if available, otherwise fallback to "Listening to Music"
 			largeText = media.album || "Listening to Music"
 		} else {
-			largeText = "Watching Video"
+			const videoAnalyzerForText = VideoAnalyzerService.getInstance()
+			const videoAnalysisForText = videoAnalyzerForText.analyzeVideo(mediaInfo)
+			largeText = videoAnalyzerForText.getLargeText(videoAnalysisForText)
 		}
 
 		const videoInfo = detectedInfo.videoInfo
@@ -306,13 +321,19 @@ class PausedState extends MediaState {
 			}
 		}
 
+		// Override small icon with Syncplay logo when active
+		const smallImage = isSyncplay
+			? "https://raw.githubusercontent.com/Syncplay/syncplay/master/syncplay/resources/syncplay.png"
+			: config.pausedImage
+		const smallImageText = isSyncplay ? "Watching Together" : smallText
+
 		const presenceData: DiscordPresenceData = {
 			details,
 			state,
 			large_image: largeImage,
 			large_text: largeText,
-			small_image: config.pausedImage,
-			small_text: smallText,
+			small_image: smallImage,
+			small_text: smallImageText,
 			start_timestamp: startTimestamp,
 			end_timestamp: endTimestamp,
 			activity_type: activityType,
