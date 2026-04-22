@@ -160,12 +160,16 @@ class PlayingState extends MediaState {
 			}
 		}
 
-		// For video content, try to fetch cover art from Google
+		// For video content, try to fetch cover art and source link
+		let sourceUrl: string | null = null
+		let sourceName: string | null = null
 		if (mediaType === "video" && media) {
-			const videoCoverUrl = await coverArtService.fetchVideoImageFromGoogle(mediaInfo)
-			if (videoCoverUrl) {
-				largeImage = videoCoverUrl
-				logger.info(`Using video cover from Google: ${videoCoverUrl}`)
+			const videoCover = await coverArtService.fetchVideoCover(mediaInfo)
+			if (videoCover.imageUrl) {
+				largeImage = videoCover.imageUrl
+				sourceUrl = videoCover.sourceUrl
+				sourceName = videoCover.sourceName
+				logger.info(`Using video cover from ${sourceName || "unknown"}: ${videoCover.imageUrl}`)
 			}
 		}
 
@@ -185,6 +189,12 @@ class PlayingState extends MediaState {
 			start_timestamp: startTimestamp,
 			end_timestamp: endTimestamp,
 			activity_type: activityType,
+		}
+
+		// Add source button (AniList or IMDB) when available
+		if (sourceUrl && sourceName) {
+			presenceData.buttons = [{ label: `View on ${sourceName}`, url: sourceUrl }]
+			logger.info(`Added button: "View on ${sourceName}" -> ${sourceUrl}`)
 		}
 
 		// Set custom activity name based on layout configuration
@@ -251,9 +261,9 @@ class PausedState extends MediaState {
 
 				state = episodeInfo || "TV Show"
 			} else {
-				// Movie: Movie title as details, year as state
+				// Movie: Movie title as details, type as state
 				details = videoAnalysis.title
-				state = videoAnalysis.year ? `(${videoAnalysis.year})` : "Movie"
+				state = "Movie"
 			}
 		}
 
@@ -312,12 +322,16 @@ class PausedState extends MediaState {
 			}
 		}
 
-		// For video content, try to fetch cover art from Google
+		// For video content, try to fetch cover art and source link
+		let sourceUrl: string | null = null
+		let sourceName: string | null = null
 		if (mediaType === "video" && media) {
-			const videoCoverUrl = await coverArtService.fetchVideoImageFromGoogle(mediaInfo)
-			if (videoCoverUrl) {
-				largeImage = videoCoverUrl
-				logger.info(`Using video cover from Google: ${videoCoverUrl}`)
+			const videoCover = await coverArtService.fetchVideoCover(mediaInfo)
+			if (videoCover.imageUrl) {
+				largeImage = videoCover.imageUrl
+				sourceUrl = videoCover.sourceUrl
+				sourceName = videoCover.sourceName
+				logger.info(`Using video cover from ${sourceName || "unknown"}: ${videoCover.imageUrl}`)
 			}
 		}
 
@@ -337,6 +351,11 @@ class PausedState extends MediaState {
 			start_timestamp: startTimestamp,
 			end_timestamp: endTimestamp,
 			activity_type: activityType,
+		}
+
+		// Add source button (AniList or IMDB) when available
+		if (sourceUrl && sourceName) {
+			presenceData.buttons = [{ label: `View on ${sourceName}`, url: sourceUrl }]
 		}
 
 		const activityName = activityType === ActivityType.Watching ? "Watching" : "Listening to"

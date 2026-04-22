@@ -12,6 +12,8 @@ import { logger } from "./logger"
 /** Cached video cover entry */
 interface CachedVideoCover {
 	url: string | null
+	sourceUrl: string | null
+	sourceName: string | null
 	timestamp: number
 	ttl: number
 }
@@ -25,6 +27,13 @@ interface MediaData {
 	date?: string
 	year?: string
 	[key: string]: string | undefined
+}
+
+/** Result from video cover art search, includes both image and source page URL */
+export interface VideoCoverResult {
+	imageUrl: string | null
+	sourceUrl: string | null
+	sourceName: string | null
 }
 
 /** Service to fetch album cover art for audio files */
@@ -126,11 +135,14 @@ export class CoverArtService {
 
 	/**
 	 * Fetch cover art for video content
-	 * Uses Jikan API (MyAnimeList) as primary source, Google Images as fallback
+	 * Uses AniList API as primary source, Google Images as fallback
+	 * Returns both the cover image URL and source page URL for Discord buttons
 	 */
-	public async fetchVideoImageFromGoogle(mediaInfo: VlcStatus | null): Promise<string | null> {
+	public async fetchVideoCover(mediaInfo: VlcStatus | null): Promise<VideoCoverResult> {
+		const emptyResult: VideoCoverResult = { imageUrl: null, sourceUrl: null, sourceName: null }
+
 		if (!mediaInfo || mediaInfo.mediaType !== "video") {
-			return null
+			return emptyResult
 		}
 
 		try {
@@ -140,7 +152,7 @@ export class CoverArtService {
 
 			if (!title || title === "Unknown") {
 				logger.warn("No valid title for video cover art search")
-				return null
+				return emptyResult
 			}
 
 			// Check in-memory cache first
@@ -150,7 +162,11 @@ export class CoverArtService {
 				const age = Math.floor(Date.now() / 1000) - cached.timestamp
 				if (age < cached.ttl) {
 					logger.info(`Using cached video cover for "${title}" (age: ${age}s)`)
-					return cached.url
+					return {
+						imageUrl: cached.url,
+						sourceUrl: cached.sourceUrl,
+						sourceName: cached.sourceName,
+					}
 				}
 				// Cache expired, remove it
 				this.videoCoverCache.delete(cacheKey)
@@ -158,10 +174,10 @@ export class CoverArtService {
 
 			// We always try AniList first because it provides the best anime/show covers.
 			// If it's a Hollywood movie, AniList will safely return no results and we'll fall back to Google.
-			const anilistCover = await this.fetchVideoCoverFromAnilist(title)
-			if (anilistCover) {
-				this.cacheVideoCover(cacheKey, anilistCover)
-				return anilistCover
+			const anilistResult = await this.fetchVideoCoverFromAnilist(title)
+			if (anilistResult.imageUrl) {
+				this.cacheVideoCover(cacheKey, anilistResult.imageUrl, anilistResult.sourceUrl, anilistResult.sourceName)
+				return anilistResult
 			}
 
 			// Step 2: Fallback to Google Images scraping
@@ -176,14 +192,29 @@ export class CoverArtService {
 				searchTerm = `${title} cover`
 			}
 
-			logger.info(`Jikan returned no results, falling back to Google for: ${searchTerm}`)
-			const googleResult = await this.fetchImageFromGoogle(searchTerm)
-			this.cacheVideoCover(cacheKey, googleResult)
-			return googleResult
+			logger.info(`AniList returned no results, falling back to Google for: ${searchTerm}`)
+			const googleImageUrl = await this.fetchImageFromGoogle(searchTerm)
+
+			// Generate IMDB search URL as the source link for non-anime content
+			const imdbSearchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(title)}`
+			const sourceUrl = googleImageUrl ? imdbSearchUrl : null
+			const sourceName = googleImageUrl ? "IMDB" : null
+
+			this.cacheVideoCover(cacheKey, googleImageUrl, sourceUrl, sourceName)
+			return { imageUrl: googleImageUrl, sourceUrl, sourceName }
 		} catch (error) {
 			logger.error(`Error fetching video cover art: ${error}`)
-			return null
+			return emptyResult
 		}
+	}
+
+	/**
+	 * Legacy method for backward compatibility
+	 * @deprecated Use fetchVideoCover() instead
+	 */
+	public async fetchVideoImageFromGoogle(mediaInfo: VlcStatus | null): Promise<string | null> {
+		const result = await this.fetchVideoCover(mediaInfo)
+		return result.imageUrl
 	}
 
 	/**
@@ -193,7 +224,12 @@ export class CoverArtService {
 	 * @param title - The anime/show title to search for
 	 * @returns Image URL from AniList CDN or null
 	 */
-	private async fetchVideoCoverFromAnilist(title: string): Promise<string | null> {
+	private async fetchVideoCoverFromAnilist(title: string): Promise<{
+		imageUrl: string | null
+		sourceUrl: string | null
+		sourceName: string | null
+	}> {
+		const emptyResult = { imageUrl: null, sourceUrl: null, sourceName: null }
 		try {
 			logger.info(`Searching AniList API for: "${title}"`)
 
@@ -203,6 +239,7 @@ export class CoverArtService {
 				id
 				title { romaji english native }
 				coverImage { extraLarge large }
+				siteUrl
 			  }
 			}`
 
@@ -230,7 +267,7 @@ export class CoverArtService {
 				} else {
 					logger.warn(`AniList API returned status: ${response.status}`)
 				}
-				return null
+				return emptyResult
 			}
 
 			const data = await response.json()
@@ -238,18 +275,19 @@ export class CoverArtService {
 
 			if (!media || !media.coverImage) {
 				logger.info(`No AniList results found for: "${title}"`)
-				return null
+				return emptyResult
 			}
 
 			const imageUrl = media.coverImage.extraLarge || media.coverImage.large
 			if (imageUrl) {
+				const sourceUrl = media.siteUrl || `https://anilist.co/anime/${media.id}`
 				logger.info(
 					`Found AniList cover for "${title}": ${media.title.romaji || media.title.english} (AniList ID: ${media.id})`,
 				)
-				return imageUrl
+				return { imageUrl, sourceUrl, sourceName: "AniList" }
 			}
 
-			return null
+			return emptyResult
 		} catch (error: unknown) {
 			const err = error as Error
 			if (err.name === "AbortError") {
@@ -257,16 +295,18 @@ export class CoverArtService {
 			} else {
 				logger.error(`Error fetching video cover from AniList: ${error}`)
 			}
-			return null
+			return emptyResult
 		}
 	}
 
 	/**
 	 * Cache a video cover result in memory
 	 */
-	private cacheVideoCover(key: string, url: string | null): void {
+	private cacheVideoCover(key: string, url: string | null, sourceUrl: string | null = null, sourceName: string | null = null): void {
 		this.videoCoverCache.set(key, {
 			url,
+			sourceUrl,
+			sourceName,
 			timestamp: Math.floor(Date.now() / 1000),
 			ttl: url ? this.videoCoverCacheTtl : this.videoCoverMissTtl,
 		})
