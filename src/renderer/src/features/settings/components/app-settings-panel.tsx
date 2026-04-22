@@ -1,4 +1,5 @@
 import { Button } from "@renderer/components/ui/button"
+import { Input } from "@renderer/components/ui/input"
 import { Switch } from "@renderer/components/ui/switch"
 import { logger } from "@renderer/lib/utils"
 import { saveConfig } from "@renderer/stores/config.store"
@@ -101,6 +102,43 @@ export function AppSettingsPanel({ config }: AppSettingsPanelProps): JSX.Element
 						/>
 					</div>
 				)}
+
+				<div className="bg-background p-3 rounded-md space-y-4">
+					<div className="flex items-center justify-between">
+						<div>
+							<p className="text-sm font-medium text-card-foreground">Custom Discord Button</p>
+							<p className="text-xs text-muted-foreground">
+								Add a custom button (e.g., My Profile) to your Rich Presence
+							</p>
+						</div>
+						<Switch
+							checked={!!config.customButtonEnabled}
+							onChange={(e) => saveConfig("customButtonEnabled", e.target.checked)}
+						/>
+					</div>
+					
+					{config.customButtonEnabled && (
+						<div className="space-y-3 pt-2 border-t border-border">
+							<div className="space-y-1">
+								<label className="text-xs font-medium text-muted-foreground">Button Label</label>
+								<Input 
+									defaultValue={config.customButtonLabel || "My Profile"}
+									onBlur={(e) => saveConfig("customButtonLabel", e.target.value)}
+									placeholder="My Profile"
+								/>
+							</div>
+							<div className="space-y-1">
+								<label className="text-xs font-medium text-muted-foreground">Button URL</label>
+								<Input 
+									defaultValue={config.customButtonUrl || ""}
+									onBlur={(e) => saveConfig("customButtonUrl", e.target.value)}
+									placeholder="https://anilist.co/user/..."
+									type="url"
+								/>
+							</div>
+						</div>
+					)}
+				</div>
 
 				<div className="flex items-center justify-between bg-background p-3 rounded-md">
 					<div>

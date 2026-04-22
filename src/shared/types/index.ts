@@ -57,6 +57,10 @@ export interface AppConfig {
 	// Discord Rich Presence layout configuration
 	presenceLayout?: PresenceLayout
 	layoutPreset?: LayoutPreset
+	// Custom Discord Button
+	customButtonEnabled?: boolean
+	customButtonLabel?: string
+	customButtonUrl?: string
 }
 
 /**

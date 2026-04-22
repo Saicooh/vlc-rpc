@@ -21,6 +21,135 @@ abstract class MediaState {
 		return text
 	}
 
+	protected async buildBasePresence(
+		mediaInfo: VlcStatus & DetectedMediaInfo,
+		config: AppConfig,
+		activityType: number,
+		details: string,
+		state: string,
+		smallImageFallback: string
+	): Promise<DiscordPresenceData> {
+		const media = mediaInfo.media
+		const mediaType = mediaInfo.mediaType || "unknown"
+		const currentTime = Math.floor(Date.now() / 1000)
+
+		let startTimestamp: number | undefined
+		let endTimestamp: number | undefined
+
+		const playback = mediaInfo.playback
+
+		if (playback) {
+			const duration = playback.duration
+			const position = playback.time
+
+			if (position >= 0 && duration > 0 && duration < 86400) {
+				startTimestamp = currentTime - position
+				endTimestamp = currentTime + (duration - position)
+			} else {
+				startTimestamp = currentTime
+			}
+		}
+
+		let smallText = smallImageFallback
+		let largeImage = config.largeImage
+		let largeText = "VLC Media Player"
+
+		// Use artwork from VLC if available
+		if (media.artworkUrl) {
+			largeImage = media.artworkUrl
+		}
+
+		// Detect Syncplay and set appropriate large text
+		const isSyncplay = await syncplayDetector.isRunning()
+
+		// Set appropriate large text based on media type
+		if (activityType === ActivityType.Listening) {
+			largeText = media.album || "Listening to Music"
+		} else {
+			const videoAnalyzerForText = VideoAnalyzerService.getInstance()
+			const videoAnalysisForText = videoAnalyzerForText.analyzeVideo(mediaInfo)
+			largeText = videoAnalyzerForText.getLargeText(videoAnalysisForText)
+		}
+
+		const videoInfo = mediaInfo.videoInfo
+		if (mediaType === "video" && videoInfo && videoInfo.width && videoInfo.height) {
+			const resolution = `${videoInfo.width}x${videoInfo.height}`
+			smallText += ` • ${resolution}`
+		}
+
+		if (mediaType === "audio" && media) {
+			const coverArtUrl = await coverArtService.fetch(mediaInfo)
+			if (coverArtUrl) {
+				largeImage = coverArtUrl
+			}
+		}
+
+		// For video content, try to fetch cover art and source link
+		let sourceUrl: string | null = null
+		let sourceName: string | null = null
+		if (mediaType === "video" && media) {
+			const videoCover = await coverArtService.fetchVideoCover(mediaInfo)
+			if (videoCover.imageUrl) {
+				largeImage = videoCover.imageUrl
+				sourceUrl = videoCover.sourceUrl
+				sourceName = videoCover.sourceName
+				logger.info(`Using video cover from ${sourceName || "unknown"}: ${videoCover.imageUrl}`)
+			}
+		}
+
+		// Override small icon with Syncplay logo when active
+		const smallImage = isSyncplay
+			? "https://raw.githubusercontent.com/Syncplay/syncplay/master/syncplay/resources/syncplay.png"
+			: smallImageFallback
+		const smallImageText = isSyncplay ? "Watching Together" : smallText
+
+		const presenceData: DiscordPresenceData = {
+			details,
+			state,
+			large_image: largeImage,
+			large_text: largeText,
+			small_image: smallImage,
+			small_text: smallImageText,
+			start_timestamp: startTimestamp,
+			end_timestamp: endTimestamp,
+			activity_type: activityType,
+		}
+
+		// Initialize buttons array
+		const buttons: Array<{ label: string; url: string }> = []
+
+		// 1. Add source button (AniList or IMDB) when available
+		if (sourceUrl && sourceName) {
+			buttons.push({ label: `View on ${sourceName}`, url: sourceUrl })
+		}
+
+		// 2. Add custom button from user config if enabled and configured
+		if (config.customButtonEnabled && config.customButtonUrl) {
+			buttons.push({
+				label: config.customButtonLabel || "My Profile",
+				url: config.customButtonUrl,
+			})
+		}
+
+		if (buttons.length > 0) {
+			// Discord limits to exactly 2 buttons
+			presenceData.buttons = buttons.slice(0, 2)
+		}
+
+		// Set custom activity name based on layout configuration
+		const layout = config.presenceLayout || (config.layoutPreset ? getLayoutByPreset(config.layoutPreset) : getDefaultLayout())
+		if (activityType === ActivityType.Listening && layout.activityName) {
+			const activityNameVariables = {
+				title: media.title || "Unknown Song",
+				artist: media.artist || "Unknown Artist",
+				album: media.album || "",
+			}
+			presenceData.name = applyTemplate(layout.activityName, activityNameVariables)
+		}
+
+		return presenceData
+	}
+
 	public abstract updatePresence(mediaInfo: VlcStatus | null): Promise<DiscordPresenceData | null>
 }
 
@@ -45,11 +174,7 @@ class PlayingState extends MediaState {
 		}
 
 		const config = configService.get<AppConfig>()
-		const currentTime = Math.floor(Date.now() / 1000)
-
-		// Use the media info directly since VLC status service already provides reliable type detection
 		const detectedInfo = mediaInfo as VlcStatus & DetectedMediaInfo
-
 		const media = detectedInfo.media
 		const mediaType = detectedInfo.mediaType || "unknown"
 
@@ -109,103 +234,14 @@ class PlayingState extends MediaState {
 		details = this.formatText(details)
 		state = this.formatText(state)
 
-		let startTimestamp: number | undefined
-		let endTimestamp: number | undefined
-
-		const playback = mediaInfo.playback
-
-		if (playback) {
-			const duration = playback.duration
-			const position = playback.time
-
-			if (position >= 0 && duration > 0 && duration < 86400) {
-				startTimestamp = currentTime - position
-				endTimestamp = currentTime + (duration - position)
-			} else {
-				startTimestamp = currentTime
-			}
-		}
-
-		let smallText = config.playingImage
-		let largeImage = config.largeImage
-		let largeText = "VLC Media Player"
-
-		// Use artwork from VLC if available
-		if (media.artworkUrl) {
-			largeImage = media.artworkUrl
-		}
-
-		// Detect Syncplay and set appropriate large text
-		const isSyncplay = await syncplayDetector.isRunning()
-
-		// Set appropriate large text based on media type
-		if (activityType === ActivityType.Listening) {
-			largeText = media.album || "Listening to Music"
-		} else {
-			const videoAnalyzerForText = VideoAnalyzerService.getInstance()
-			const videoAnalysisForText = videoAnalyzerForText.analyzeVideo(mediaInfo)
-			largeText = videoAnalyzerForText.getLargeText(videoAnalysisForText)
-		}
-
-		const videoInfo = detectedInfo.videoInfo
-		if (mediaType === "video" && videoInfo && videoInfo.width && videoInfo.height) {
-			const resolution = `${videoInfo.width}x${videoInfo.height}`
-			smallText += ` • ${resolution}`
-		}
-
-		if (mediaType === "audio" && media) {
-			const coverArtUrl = await coverArtService.fetch(mediaInfo)
-			if (coverArtUrl) {
-				largeImage = coverArtUrl
-			}
-		}
-
-		// For video content, try to fetch cover art and source link
-		let sourceUrl: string | null = null
-		let sourceName: string | null = null
-		if (mediaType === "video" && media) {
-			const videoCover = await coverArtService.fetchVideoCover(mediaInfo)
-			if (videoCover.imageUrl) {
-				largeImage = videoCover.imageUrl
-				sourceUrl = videoCover.sourceUrl
-				sourceName = videoCover.sourceName
-				logger.info(`Using video cover from ${sourceName || "unknown"}: ${videoCover.imageUrl}`)
-			}
-		}
-
-		// Override small icon with Syncplay logo when active
-		const smallImage = isSyncplay
-			? "https://raw.githubusercontent.com/Syncplay/syncplay/master/syncplay/resources/syncplay.png"
-			: config.playingImage
-		const smallImageText = isSyncplay ? "Watching Together" : smallText
-
-		const presenceData: DiscordPresenceData = {
+		const presenceData = await this.buildBasePresence(
+			detectedInfo,
+			config,
+			activityType,
 			details,
 			state,
-			large_image: largeImage,
-			large_text: largeText,
-			small_image: smallImage,
-			small_text: smallImageText,
-			start_timestamp: startTimestamp,
-			end_timestamp: endTimestamp,
-			activity_type: activityType,
-		}
-
-		// Add source button (AniList or IMDB) when available
-		if (sourceUrl && sourceName) {
-			presenceData.buttons = [{ label: `View on ${sourceName}`, url: sourceUrl }]
-			logger.info(`Added button: "View on ${sourceName}" -> ${sourceUrl}`)
-		}
-
-		// Set custom activity name based on layout configuration
-		if (activityType === ActivityType.Listening && layout.activityName) {
-			const activityNameVariables = {
-				title: media.title || "Unknown Song",
-				artist: media.artist || "Unknown Artist",
-				album: media.album || "",
-			}
-			presenceData.name = applyTemplate(layout.activityName, activityNameVariables)
-		}
+			config.playingImage
+		)
 
 		const activityName = activityType === ActivityType.Watching ? "Watching" : "Listening to"
 		logger.info(`Updated presence: ${activityName} ${details} - ${state}`)
@@ -221,10 +257,7 @@ class PausedState extends MediaState {
 		}
 
 		const config = configService.get<AppConfig>()
-
-		// Use the media info directly since VLC status service already provides reliable type detection
 		const detectedInfo = mediaInfo as VlcStatus & DetectedMediaInfo
-
 		const media = detectedInfo.media
 		const mediaType = detectedInfo.mediaType || "unknown"
 
@@ -270,93 +303,14 @@ class PausedState extends MediaState {
 		details = this.formatText(details)
 		state = this.formatText(state)
 
-		let smallText = "Paused"
-		let largeImage = config.largeImage
-		let largeText = "VLC Media Player"
-
-		let startTimestamp: number | undefined
-		let endTimestamp: number | undefined
-
-		const playback = mediaInfo.playback
-		const currentTime = Math.floor(Date.now() / 1000)
-
-		if (playback) {
-			const duration = playback.duration
-			const position = playback.time
-
-			if (position >= 0 && duration > 0 && duration < 86400) {
-				startTimestamp = currentTime - position
-				endTimestamp = currentTime + (duration - position)
-			} else {
-				startTimestamp = currentTime
-			}
-		}
-
-		// Use artwork from VLC if available
-		if (media.artworkUrl) {
-			largeImage = media.artworkUrl
-		}
-
-		// Detect Syncplay and set appropriate large text
-		const isSyncplay = await syncplayDetector.isRunning()
-
-		// Set appropriate large text based on media type
-		if (activityType === ActivityType.Listening) {
-			largeText = media.album || "Listening to Music"
-		} else {
-			const videoAnalyzerForText = VideoAnalyzerService.getInstance()
-			const videoAnalysisForText = videoAnalyzerForText.analyzeVideo(mediaInfo)
-			largeText = videoAnalyzerForText.getLargeText(videoAnalysisForText)
-		}
-
-		const videoInfo = detectedInfo.videoInfo
-		if (mediaType === "video" && videoInfo && videoInfo.width && videoInfo.height) {
-			const resolution = `${videoInfo.width}x${videoInfo.height}`
-			smallText += ` • ${resolution}`
-		}
-
-		if (mediaType === "audio" && media) {
-			const coverArtUrl = await coverArtService.fetch(mediaInfo)
-			if (coverArtUrl) {
-				largeImage = coverArtUrl
-			}
-		}
-
-		// For video content, try to fetch cover art and source link
-		let sourceUrl: string | null = null
-		let sourceName: string | null = null
-		if (mediaType === "video" && media) {
-			const videoCover = await coverArtService.fetchVideoCover(mediaInfo)
-			if (videoCover.imageUrl) {
-				largeImage = videoCover.imageUrl
-				sourceUrl = videoCover.sourceUrl
-				sourceName = videoCover.sourceName
-				logger.info(`Using video cover from ${sourceName || "unknown"}: ${videoCover.imageUrl}`)
-			}
-		}
-
-		// Override small icon with Syncplay logo when active
-		const smallImage = isSyncplay
-			? "https://raw.githubusercontent.com/Syncplay/syncplay/master/syncplay/resources/syncplay.png"
-			: config.pausedImage
-		const smallImageText = isSyncplay ? "Watching Together" : smallText
-
-		const presenceData: DiscordPresenceData = {
+		const presenceData = await this.buildBasePresence(
+			detectedInfo,
+			config,
+			activityType,
 			details,
 			state,
-			large_image: largeImage,
-			large_text: largeText,
-			small_image: smallImage,
-			small_text: smallImageText,
-			start_timestamp: startTimestamp,
-			end_timestamp: endTimestamp,
-			activity_type: activityType,
-		}
-
-		// Add source button (AniList or IMDB) when available
-		if (sourceUrl && sourceName) {
-			presenceData.buttons = [{ label: `View on ${sourceName}`, url: sourceUrl }]
-		}
+			config.pausedImage
+		)
 
 		const activityName = activityType === ActivityType.Watching ? "Watching" : "Listening to"
 		logger.info(`Updated presence (paused): ${activityName} ${details} - ${state}`)

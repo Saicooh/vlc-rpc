@@ -23,6 +23,9 @@ export const DEFAULT_CONFIG: AppConfig = {
 	fileMetadata: {}, // Empty object for file metadata storage
 	presenceLayout: getDefaultLayout(),
 	layoutPreset: "default",
+	customButtonEnabled: false,
+	customButtonLabel: "My Profile",
+	customButtonUrl: "",
 }
 
 /**
