@@ -27,7 +27,7 @@ abstract class MediaState {
 		activityType: number,
 		details: string,
 		state: string,
-		smallImageFallback: string
+		smallImageFallback: string,
 	): Promise<DiscordPresenceData> {
 		const media = mediaInfo.media
 		const mediaType = mediaInfo.mediaType || "unknown"
@@ -137,7 +137,9 @@ abstract class MediaState {
 		}
 
 		// Set custom activity name based on layout configuration
-		const layout = config.presenceLayout || (config.layoutPreset ? getLayoutByPreset(config.layoutPreset) : getDefaultLayout())
+		const layout =
+			config.presenceLayout ||
+			(config.layoutPreset ? getLayoutByPreset(config.layoutPreset) : getDefaultLayout())
 		if (activityType === ActivityType.Listening && layout.activityName) {
 			const activityNameVariables = {
 				title: media.title || "Unknown Song",
@@ -240,7 +242,7 @@ class PlayingState extends MediaState {
 			activityType,
 			details,
 			state,
-			config.playingImage
+			config.playingImage,
 		)
 
 		const activityName = activityType === ActivityType.Watching ? "Watching" : "Listening to"
@@ -309,7 +311,7 @@ class PausedState extends MediaState {
 			activityType,
 			details,
 			state,
-			config.pausedImage
+			config.pausedImage,
 		)
 
 		const activityName = activityType === ActivityType.Watching ? "Watching" : "Listening to"

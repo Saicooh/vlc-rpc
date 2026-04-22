@@ -7,8 +7,6 @@ import type { VlcStatus } from "@shared/types/vlc"
 import * as cheerio from "cheerio"
 import { logger } from "./logger"
 
-
-
 /** Cached video cover entry */
 interface CachedVideoCover {
 	url: string | null
@@ -176,7 +174,12 @@ export class CoverArtService {
 			// If it's a Hollywood movie, AniList will safely return no results and we'll fall back to Google.
 			const anilistResult = await this.fetchVideoCoverFromAnilist(title)
 			if (anilistResult.imageUrl) {
-				this.cacheVideoCover(cacheKey, anilistResult.imageUrl, anilistResult.sourceUrl, anilistResult.sourceName)
+				this.cacheVideoCover(
+					cacheKey,
+					anilistResult.imageUrl,
+					anilistResult.sourceUrl,
+					anilistResult.sourceName,
+				)
 				return anilistResult
 			}
 
@@ -302,7 +305,12 @@ export class CoverArtService {
 	/**
 	 * Cache a video cover result in memory
 	 */
-	private cacheVideoCover(key: string, url: string | null, sourceUrl: string | null = null, sourceName: string | null = null): void {
+	private cacheVideoCover(
+		key: string,
+		url: string | null,
+		sourceUrl: string | null = null,
+		sourceName: string | null = null,
+	): void {
 		this.videoCoverCache.set(key, {
 			url,
 			sourceUrl,

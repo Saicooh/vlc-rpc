@@ -31,6 +31,16 @@ graph LR
 - **Auto-Updates**: Built-in update system for the latest features
 - **Windows Optimized**: Fast and lightweight, designed specifically for Windows
 
+## Fork Features (Advanced Media Tracking)
+
+This fork significantly enhances the original `vlc-rpc` capabilities by adding deep integrations with media databases and Discord interactivity:
+
+- **AniList & IMDB Integration**: Automatically fetches high-quality cover art for anime, movies, and TV shows using AniList's GraphQL API and IMDB, bypassing Discord's image blocks.
+- **Dynamic Presence State**: Identifies media accurately, changing hover texts dynamically based on the content (e.g., "Watching Anime", "Watching Movie", "Watching TV Show").
+- **Interactive Source Buttons**: Adds clickable buttons to the Discord Rich Presence linking directly to the AniList or IMDB page of the media you're watching.
+- **Custom Profile Buttons**: Configure your own custom persistent button right from the UI (e.g., "My AniList Profile") to display on your Rich Presence alongside your media.
+- **Syncplay Integration**: Accurately detects when you are watching together with friends using Syncplay and overrides the presence icon to "Watching Together".
+
 ## Installation
 
 ### Option 1: Setup Installer (Recommended)
