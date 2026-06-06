@@ -260,6 +260,13 @@ export class VideoAnalyzerService {
 
 		let cleaned = title
 
+		// Remove directory paths if present (e.g. C:\folder\file.mkv or E/folder/file.mkv)
+		// We only split if we detect multiple slashes or backslashes to avoid breaking titles like "Fate/stay night"
+		if (cleaned.includes('\\') || (cleaned.match(/\//g) || []).length >= 2 || /^[A-Z]:\//i.test(cleaned)) {
+			const parts = cleaned.split(/[/\\]/)
+			cleaned = parts.filter(p => p.trim().length > 0).pop() || cleaned
+		}
+
 		// Remove file extension if present
 		cleaned = cleaned.replace(/\.(mkv|mp4|avi|wmv|flv|webm|m4v|mov|ts|mpg|mpeg)$/i, "")
 
