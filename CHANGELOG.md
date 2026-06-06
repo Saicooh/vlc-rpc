@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.1.1
+
+### Patch Changes
+
+- 5271226: Fix video analyzer to handle directory paths in filenames (e.g. C:\folder\file.mkv)
+- 3aa72d0: Fix release workflow to properly build binaries without auto-publishing
+
 ## 4.1.0
 
 ### Minor Changes
