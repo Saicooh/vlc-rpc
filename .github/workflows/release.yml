@@ -64,9 +64,8 @@ jobs:
 
           gh release create "${{ env.TAG }}" `
             --title "VLC Discord RP ${{ env.TAG }}" `
-            --notes "See [CHANGELOG.md](https://github.com/valentin-marquez/vlc-rpc/blob/main/CHANGELOG.md) for detailed changes." `
+            --notes "See [CHANGELOG.md](https://github.com/Saicooh/vlc-rpc/blob/main/CHANGELOG.md) for detailed changes." `
             dist/*.exe `
-            dist/*.zip `
             dist/*.yml `
             dist/*.blockmap `
             --latest
