@@ -28,6 +28,7 @@
 		"lint": "biome check --write --unsafe .",
 		"lint:fix": "biome check --write .",
 		"lint:files": "biome check --write",
+		"test:matcher": "tsc -p tsconfig.test.json && node --test out-test/tests/main/services/anilist-matcher.test.js",
 		"typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
 		"typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
 		"typecheck": "npm run typecheck:node && npm run typecheck:web",

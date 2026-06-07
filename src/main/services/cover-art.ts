@@ -5,6 +5,12 @@ import { VideoAnalyzerService } from "@main/services/video-analyzer"
 import { vlcStatusService } from "@main/services/vlc-status"
 import type { VlcStatus } from "@shared/types/vlc"
 import * as cheerio from "cheerio"
+import {
+	buildAnilistSearchCandidates,
+	findBestAnilistMatch,
+	type AnilistAcceptedMatch,
+	type AnilistMedia,
+} from "./anilist/anilist-matcher"
 import { logger } from "./logger"
 
 /** Cached video cover entry */
@@ -17,25 +23,6 @@ interface CachedVideoCover {
 	ttl: number
 }
 
-interface AnilistTitle {
-	romaji: string | null
-	english: string | null
-	native: string | null
-}
-
-interface AnilistCoverImage {
-	extraLarge: string | null
-	large: string | null
-}
-
-interface AnilistMedia {
-	id: number
-	title: AnilistTitle | null
-	synonyms: string[] | null
-	coverImage: AnilistCoverImage | null
-	siteUrl: string | null
-}
-
 interface AnilistSearchResponse {
 	data?: {
 		Page?: {
@@ -43,20 +30,6 @@ interface AnilistSearchResponse {
 		} | null
 	} | null
 }
-
-interface AnilistSearchCandidate {
-	value: string
-	isSubtitleFallback: boolean
-	seriesContext?: string
-}
-
-interface AnilistAcceptedMatch {
-	media: AnilistMedia
-	score: number
-	candidate: AnilistSearchCandidate
-	canonicalTitle: string
-}
-
 /** Media data structure for cover art searching */
 interface MediaData {
 	title?: string
@@ -75,28 +48,6 @@ export interface VideoCoverResult {
 	sourceName: string | null
 	canonicalTitle: string | null
 }
-
-const ANILIST_FORMAT_DESCRIPTORS = new Set(["movie", "film", "ova", "ona", "special", "specials"])
-
-const ANILIST_GENERIC_SUBTITLE_TOKENS = new Set([
-	"a",
-	"an",
-	"the",
-	"final",
-	"season",
-	"part",
-	"chapter",
-	"episode",
-	"movie",
-	"film",
-	"special",
-	"specials",
-])
-
-const ANILIST_DESCRIPTOR_PATTERN = /\b(?:the\s+movie|movie|film|ova|ona|specials?|pel[ií]cula)\b/gi
-
-const ANILIST_RELEASE_NOISE_PATTERN =
-	/\b(?:\d{3,4}p|4k|uhd|web(?:-dl|rip)?|bdrip|bluray|blu-ray|hevc|x26[45]|aac|flac|dual|dub(?:bed)?|sub(?:bed)?|multi|remux|hdr|sdr)\b/gi
 
 /** Service to fetch album cover art for audio files */
 export class CoverArtService {
@@ -306,7 +257,7 @@ export class CoverArtService {
 	}> {
 		const emptyResult = { imageUrl: null, sourceUrl: null, sourceName: null, canonicalTitle: null }
 		try {
-			const candidates = this.buildAnilistSearchCandidates(title)
+			const candidates = buildAnilistSearchCandidates(title)
 			logger.info(
 				`Searching AniList API for "${title}" with candidates: ${candidates.map((candidate) => `"${candidate.value}"`).join(", ")}`,
 			)
@@ -355,7 +306,7 @@ export class CoverArtService {
 
 					const data = (await response.json()) as AnilistSearchResponse
 					const mediaResults = data.data?.Page?.media ?? []
-					const acceptedMatch = this.findBestAnilistMatch(title, candidate, mediaResults)
+					const acceptedMatch = findBestAnilistMatch(title, candidate, mediaResults)
 
 					if (acceptedMatch && (!bestMatch || acceptedMatch.score > bestMatch.score)) {
 						bestMatch = acceptedMatch
@@ -400,288 +351,6 @@ export class CoverArtService {
 			}
 			return emptyResult
 		}
-	}
-
-	private buildAnilistSearchCandidates(title: string): AnilistSearchCandidate[] {
-		const cleanedTitle = this.cleanAnilistSearchText(title)
-		const descriptorSplit = this.splitOnFormatDescriptor(cleanedTitle)
-		const seriesContext = descriptorSplit?.series
-		const candidates: AnilistSearchCandidate[] = []
-		const addCandidate = (
-			value: string,
-			isSubtitleFallback = false,
-			seriesContext?: string,
-		): void => {
-			const cleanedValue = this.cleanAnilistSearchText(value)
-			if (!cleanedValue) return
-
-			const normalizedValue = this.normalizeAnilistText(cleanedValue).compact
-			if (
-				candidates.some(
-					(candidate) => this.normalizeAnilistText(candidate.value).compact === normalizedValue,
-				)
-			) {
-				return
-			}
-
-			candidates.push({ value: cleanedValue, isSubtitleFallback, seriesContext })
-		}
-
-		addCandidate(title, false, seriesContext)
-		addCandidate(cleanedTitle, false, seriesContext)
-
-		const withoutDescriptors = this.removeAnilistDescriptors(cleanedTitle)
-		addCandidate(withoutDescriptors, false, seriesContext)
-
-		if (descriptorSplit) {
-			const { series, subtitle } = descriptorSplit
-			addCandidate(`${series}: ${subtitle}`, false, series)
-			addCandidate(`${series} ${subtitle}`, false, series)
-			addCandidate(subtitle, true, series)
-		}
-
-		return candidates.slice(0, 8)
-	}
-
-	private cleanAnilistSearchText(value: string): string {
-		return value
-			.replace(/\.(mkv|mp4|avi|wmv|flv|webm|m4v|mov|ts|mpg|mpeg)$/i, "")
-			.replace(/\[[^\]]*\]/g, " ")
-			.replace(/\((?!\d{4}\))[^)]*\)/g, " ")
-			.replace(ANILIST_RELEASE_NOISE_PATTERN, " ")
-			.replace(/[._]+/g, " ")
-			.replace(/[\s\-–—]+$/g, "")
-			.replace(/^[\s\-–—]+/g, "")
-			.replace(/\s{2,}/g, " ")
-			.trim()
-	}
-
-	private removeAnilistDescriptors(value: string): string {
-		return value
-			.replace(ANILIST_DESCRIPTOR_PATTERN, " ")
-			.replace(/\s{2,}/g, " ")
-			.replace(/\s+([:;,.!?])/g, "$1")
-			.trim()
-	}
-
-	private splitOnFormatDescriptor(value: string): { series: string; subtitle: string } | null {
-		const tokens = value.split(/\s+/).filter(Boolean)
-		const descriptorIndex = tokens.findIndex((token) =>
-			ANILIST_FORMAT_DESCRIPTORS.has(this.normalizeToken(token)),
-		)
-
-		if (descriptorIndex <= 0 || descriptorIndex >= tokens.length - 1) {
-			return null
-		}
-
-		const series = tokens.slice(0, descriptorIndex).join(" ").trim()
-		const subtitle = tokens
-			.slice(descriptorIndex + 1)
-			.join(" ")
-			.trim()
-
-		if (!series || !subtitle) {
-			return null
-		}
-
-		return { series, subtitle }
-	}
-
-	private findBestAnilistMatch(
-		originalTitle: string,
-		candidate: AnilistSearchCandidate,
-		mediaResults: AnilistMedia[],
-	): AnilistAcceptedMatch | null {
-		let bestMatch: AnilistAcceptedMatch | null = null
-
-		for (const media of mediaResults) {
-			const canonicalTitle = this.getCanonicalAnilistTitle(media)
-			if (!canonicalTitle) continue
-
-			const titles = this.getAnilistComparableTitles(media)
-			const candidateScore = Math.max(
-				...titles.map((mediaTitle) => this.scoreAnilistTitle(candidate.value, mediaTitle)),
-			)
-			const originalScore = Math.max(
-				...titles.map((mediaTitle) => this.scoreAnilistTitle(originalTitle, mediaTitle)),
-			)
-			const seriesContextScore = candidate.seriesContext
-				? Math.max(
-						...titles.map((mediaTitle) =>
-							this.scoreAnilistTitle(candidate.seriesContext ?? "", mediaTitle),
-						),
-					)
-				: 0
-			const score = Math.max(candidateScore, originalScore)
-
-			if (
-				!this.isAnilistMatchAccepted(
-					candidate,
-					candidateScore,
-					originalScore,
-					seriesContextScore,
-					score,
-				)
-			) {
-				continue
-			}
-
-			if (!bestMatch || score > bestMatch.score) {
-				bestMatch = { media, score, candidate, canonicalTitle }
-			}
-		}
-
-		return bestMatch
-	}
-
-	private getCanonicalAnilistTitle(media: AnilistMedia): string | null {
-		return media.title?.english || media.title?.romaji || null
-	}
-
-	private getAnilistComparableTitles(media: AnilistMedia): string[] {
-		const titles = [
-			media.title?.romaji,
-			media.title?.english,
-			media.title?.native,
-			...(media.synonyms ?? []),
-		]
-
-		return titles.filter((title): title is string => Boolean(title?.trim()))
-	}
-
-	private isAnilistMatchAccepted(
-		candidate: AnilistSearchCandidate,
-		candidateScore: number,
-		originalScore: number,
-		seriesContextScore: number,
-		score: number,
-	): boolean {
-		if (candidate.isSubtitleFallback) {
-			return (
-				this.hasSpecificSubtitleFallback(candidate.value) &&
-				candidateScore >= 0.8 &&
-				originalScore >= 0.9 &&
-				seriesContextScore >= 0.72
-			)
-		}
-
-		if (candidate.seriesContext) {
-			return score >= 0.78 && seriesContextScore >= 0.72
-		}
-
-		return score >= 0.78
-	}
-
-	private hasSpecificSubtitleFallback(value: string): boolean {
-		const normalized = this.normalizeAnilistText(value)
-		const meaningfulTokens = normalized.tokens.filter(
-			(token) => !ANILIST_GENERIC_SUBTITLE_TOKENS.has(token),
-		)
-
-		return normalized.compact.length >= 12 && meaningfulTokens.length >= 2
-	}
-
-	private scoreAnilistTitle(inputTitle: string, mediaTitle: string): number {
-		const input = this.normalizeAnilistText(this.removeAnilistDescriptors(inputTitle))
-		const media = this.normalizeAnilistText(this.removeAnilistDescriptors(mediaTitle))
-
-		if (!input.compact || !media.compact) {
-			return 0
-		}
-
-		if (input.compact === media.compact) {
-			return 1
-		}
-
-		const compactContainment = this.getContainmentScore(input.compact, media.compact)
-		const tokenCoverage = this.getTokenCoverageScore(input.tokens, media.tokens)
-		const diceScore = this.getDiceCoefficient(input.compact, media.compact)
-
-		return Math.max(compactContainment, tokenCoverage, diceScore)
-	}
-
-	private normalizeAnilistText(value: string): { compact: string; tokens: string[] } {
-		const normalized = value
-			.normalize("NFKD")
-			.replace(/\p{M}/gu, "")
-			.replace(/&/g, " and ")
-			.replace(/[^\p{L}\p{N}\s]/gu, " ")
-			.toLowerCase()
-			.replace(/\s{2,}/g, " ")
-			.trim()
-
-		const tokens = normalized
-			.split(/\s+/)
-			.map((token) => this.normalizeToken(token))
-			.filter((token) => token && !ANILIST_FORMAT_DESCRIPTORS.has(token))
-
-		return {
-			compact: tokens.join(""),
-			tokens,
-		}
-	}
-
-	private normalizeToken(value: string): string {
-		return value
-			.normalize("NFKD")
-			.replace(/\p{M}/gu, "")
-			.replace(/[^\p{L}\p{N}]/gu, "")
-			.toLowerCase()
-	}
-
-	private getContainmentScore(left: string, right: string): number {
-		const shorter = left.length <= right.length ? left : right
-		const longer = left.length > right.length ? left : right
-
-		if (shorter.length < 6 || !longer.includes(shorter)) {
-			return 0
-		}
-
-		return 0.72 + 0.2 * (shorter.length / longer.length)
-	}
-
-	private getTokenCoverageScore(inputTokens: string[], mediaTokens: string[]): number {
-		if (inputTokens.length === 0 || mediaTokens.length === 0) {
-			return 0
-		}
-
-		const inputCompact = inputTokens.join("")
-		const mediaCompact = mediaTokens.join("")
-		const matchedInputTokens = inputTokens.filter((token) => mediaCompact.includes(token)).length
-		const matchedMediaTokens = mediaTokens.filter((token) => inputCompact.includes(token)).length
-		const inputCoverage = matchedInputTokens / inputTokens.length
-		const mediaCoverage = matchedMediaTokens / mediaTokens.length
-
-		return (inputCoverage + mediaCoverage) / 2
-	}
-
-	private getDiceCoefficient(left: string, right: string): number {
-		if (left.length < 2 || right.length < 2) {
-			return left === right ? 1 : 0
-		}
-
-		const leftBigrams = this.getBigrams(left)
-		const rightBigrams = this.getBigrams(right)
-		const remainingRightBigrams = [...rightBigrams]
-		let intersection = 0
-
-		for (const bigram of leftBigrams) {
-			const index = remainingRightBigrams.indexOf(bigram)
-			if (index >= 0) {
-				intersection += 1
-				remainingRightBigrams.splice(index, 1)
-			}
-		}
-
-		return (2 * intersection) / (leftBigrams.length + rightBigrams.length)
-	}
-
-	private getBigrams(value: string): string[] {
-		const bigrams: string[] = []
-		for (let index = 0; index < value.length - 1; index += 1) {
-			bigrams.push(value.slice(index, index + 2))
-		}
-		return bigrams
 	}
 
 	/**
