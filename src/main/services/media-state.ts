@@ -1,13 +1,13 @@
 import { applyTemplate, getDefaultLayout, getLayoutByPreset } from "@shared/constants/layouts"
-import type { AppConfig } from "@shared/types"
+import type { AppConfig, PresenceLayout } from "@shared/types"
 import type { DetectedMediaInfo, DiscordPresenceData } from "@shared/types/media"
 import type { VlcStatus } from "@shared/types/vlc"
 import { ActivityType } from "discord-api-types/v10"
 import { configService } from "./config"
-import { coverArtService } from "./cover-art"
+import { type VideoCoverResult, coverArtService } from "./cover-art"
 import { logger } from "./logger"
 import { syncplayDetector } from "./syncplay-detector"
-import { VideoAnalyzerService } from "./video-analyzer"
+import { type VideoAnalysis, VideoAnalyzerService } from "./video-analyzer"
 
 /**
  * Base class for media states
@@ -21,6 +21,93 @@ abstract class MediaState {
 		return text
 	}
 
+	protected getConfiguredLayout(config: AppConfig): PresenceLayout {
+		return (
+			config.presenceLayout ||
+			(config.layoutPreset ? getLayoutByPreset(config.layoutPreset) : getDefaultLayout())
+		)
+	}
+
+	protected buildMusicTemplateVariables(media: VlcStatus["media"]): Record<string, string> {
+		return {
+			title: media.title || "Unknown Song",
+			artist: media.artist || "Unknown Artist",
+			album: media.album || "",
+		}
+	}
+
+	protected buildVideoEpisodeInfo(videoAnalysis: VideoAnalysis): string {
+		if (!videoAnalysis.isTvShow) {
+			return "Movie"
+		}
+
+		if (videoAnalysis.season && videoAnalysis.episode) {
+			return `S${videoAnalysis.season}E${videoAnalysis.episode}`
+		}
+
+		if (videoAnalysis.season) {
+			return `Season ${videoAnalysis.season}`
+		}
+
+		if (videoAnalysis.episode) {
+			return `Episode ${videoAnalysis.episode}`
+		}
+
+		return "TV Show"
+	}
+
+	protected buildVideoTemplateVariables(
+		mediaInfo: VlcStatus,
+		correctedTitle?: string,
+	): Record<string, string> {
+		const videoAnalyzer = VideoAnalyzerService.getInstance()
+		const videoAnalysis = videoAnalyzer.analyzeVideo(mediaInfo)
+
+		return {
+			title: correctedTitle || videoAnalysis.title,
+			episodeInfo: this.buildVideoEpisodeInfo(videoAnalysis),
+			year: videoAnalysis.year || "",
+			season: videoAnalysis.season?.toString() || "",
+			episode: videoAnalysis.episode?.toString() || "",
+		}
+	}
+
+	protected buildPresenceText(
+		mediaInfo: VlcStatus & DetectedMediaInfo,
+		config: AppConfig,
+		activityType: number,
+		correctedVideoTitle?: string,
+	): { details: string; state: string } {
+		const layout = this.getConfiguredLayout(config)
+
+		if (activityType === ActivityType.Listening) {
+			const variables = this.buildMusicTemplateVariables(mediaInfo.media)
+
+			return {
+				details: this.formatText(applyTemplate(layout.musicDetails, variables)),
+				state: this.formatText(applyTemplate(layout.musicState, variables)),
+			}
+		}
+
+		const variables = this.buildVideoTemplateVariables(mediaInfo, correctedVideoTitle)
+
+		return {
+			details: this.formatText(applyTemplate(layout.videoDetails, variables)),
+			state: this.formatText(applyTemplate(layout.videoState, variables)),
+		}
+	}
+
+	protected async resolveVideoCover(
+		mediaInfo: VlcStatus & DetectedMediaInfo,
+		mediaType: string,
+	): Promise<VideoCoverResult | null> {
+		if (mediaType !== "video") {
+			return null
+		}
+
+		return coverArtService.fetchVideoCover(mediaInfo)
+	}
+
 	protected async buildBasePresence(
 		mediaInfo: VlcStatus & DetectedMediaInfo,
 		config: AppConfig,
@@ -28,6 +115,7 @@ abstract class MediaState {
 		details: string,
 		state: string,
 		smallImageFallback: string,
+		videoCover: VideoCoverResult | null = null,
 	): Promise<DiscordPresenceData> {
 		const media = mediaInfo.media
 		const mediaType = mediaInfo.mediaType || "unknown"
@@ -88,12 +176,14 @@ abstract class MediaState {
 		let sourceUrl: string | null = null
 		let sourceName: string | null = null
 		if (mediaType === "video" && media) {
-			const videoCover = await coverArtService.fetchVideoCover(mediaInfo)
-			if (videoCover.imageUrl) {
-				largeImage = videoCover.imageUrl
-				sourceUrl = videoCover.sourceUrl
-				sourceName = videoCover.sourceName
-				logger.info(`Using video cover from ${sourceName || "unknown"}: ${videoCover.imageUrl}`)
+			const resolvedVideoCover = videoCover || (await coverArtService.fetchVideoCover(mediaInfo))
+			if (resolvedVideoCover.imageUrl) {
+				largeImage = resolvedVideoCover.imageUrl
+				sourceUrl = resolvedVideoCover.sourceUrl
+				sourceName = resolvedVideoCover.sourceName
+				logger.info(
+					`Using video cover from ${sourceName || "unknown"}: ${resolvedVideoCover.imageUrl}`,
+				)
 			}
 		}
 
@@ -137,15 +227,9 @@ abstract class MediaState {
 		}
 
 		// Set custom activity name based on layout configuration
-		const layout =
-			config.presenceLayout ||
-			(config.layoutPreset ? getLayoutByPreset(config.layoutPreset) : getDefaultLayout())
+		const layout = this.getConfiguredLayout(config)
 		if (activityType === ActivityType.Listening && layout.activityName) {
-			const activityNameVariables = {
-				title: media.title || "Unknown Song",
-				artist: media.artist || "Unknown Artist",
-				album: media.album || "",
-			}
+			const activityNameVariables = this.buildMusicTemplateVariables(media)
 			presenceData.name = applyTemplate(layout.activityName, activityNameVariables)
 		}
 
@@ -177,7 +261,6 @@ class PlayingState extends MediaState {
 
 		const config = configService.get<AppConfig>()
 		const detectedInfo = mediaInfo as VlcStatus & DetectedMediaInfo
-		const media = detectedInfo.media
 		const mediaType = detectedInfo.mediaType || "unknown"
 
 		// Simple activity type detection based on VLC's media type
@@ -187,54 +270,13 @@ class PlayingState extends MediaState {
 			`Activity type: ${activityType === ActivityType.Watching ? "WATCHING" : "LISTENING"} for media type: ${mediaType}`,
 		)
 
-		// Get the layout configuration
-		const layout =
-			config.presenceLayout ||
-			(config.layoutPreset ? getLayoutByPreset(config.layoutPreset) : getDefaultLayout())
-
-		let details = ""
-		let state = ""
-
-		if (activityType === ActivityType.Listening) {
-			// For music, use customizable layout
-			const variables = {
-				title: media.title || "Unknown Song",
-				artist: media.artist || "Unknown Artist",
-				album: media.album || "",
-			}
-
-			details = applyTemplate(layout.musicDetails, variables)
-			state = applyTemplate(layout.musicState, variables)
-		} else {
-			// For video content, analyze the video and provide richer information
-			const videoAnalyzer = VideoAnalyzerService.getInstance()
-			const videoAnalysis = videoAnalyzer.analyzeVideo(mediaInfo)
-
-			let episodeInfo = ""
-			if (videoAnalysis.isTvShow) {
-				if (videoAnalysis.season && videoAnalysis.episode) {
-					episodeInfo = `S${videoAnalysis.season}E${videoAnalysis.episode}`
-				} else if (videoAnalysis.season) {
-					episodeInfo = `Season ${videoAnalysis.season}`
-				} else if (videoAnalysis.episode) {
-					episodeInfo = `Episode ${videoAnalysis.episode}`
-				}
-			}
-
-			const variables = {
-				title: videoAnalysis.title,
-				episodeInfo: episodeInfo || (videoAnalysis.isTvShow ? "TV Show" : "Movie"),
-				year: videoAnalysis.year || "",
-				season: videoAnalysis.season?.toString() || "",
-				episode: videoAnalysis.episode?.toString() || "",
-			}
-
-			details = applyTemplate(layout.videoDetails, variables)
-			state = applyTemplate(layout.videoState, variables)
-		}
-
-		details = this.formatText(details)
-		state = this.formatText(state)
+		const videoCover = await this.resolveVideoCover(detectedInfo, mediaType)
+		const { details, state } = this.buildPresenceText(
+			detectedInfo,
+			config,
+			activityType,
+			videoCover?.canonicalTitle || undefined,
+		)
 
 		const presenceData = await this.buildBasePresence(
 			detectedInfo,
@@ -243,6 +285,7 @@ class PlayingState extends MediaState {
 			details,
 			state,
 			config.playingImage,
+			videoCover,
 		)
 
 		const activityName = activityType === ActivityType.Watching ? "Watching" : "Listening to"
@@ -260,7 +303,6 @@ class PausedState extends MediaState {
 
 		const config = configService.get<AppConfig>()
 		const detectedInfo = mediaInfo as VlcStatus & DetectedMediaInfo
-		const media = detectedInfo.media
 		const mediaType = detectedInfo.mediaType || "unknown"
 
 		// Simple activity type detection based on VLC's media type
@@ -270,40 +312,13 @@ class PausedState extends MediaState {
 			`Paused activity type: ${activityType === ActivityType.Watching ? "WATCHING" : "LISTENING"} for media type: ${mediaType}`,
 		)
 
-		let details = ""
-		let state = ""
-
-		if (activityType === ActivityType.Listening) {
-			details = media.title || "Unknown Song"
-			state = `by ${media.artist || "Unknown Artist"}`
-		} else {
-			// For video content, analyze the video and provide richer information
-			const videoAnalyzer = VideoAnalyzerService.getInstance()
-			const videoAnalysis = videoAnalyzer.analyzeVideo(mediaInfo)
-
-			if (videoAnalysis.isTvShow) {
-				// TV Show: Show name as details, episode info as state
-				details = videoAnalysis.title
-
-				let episodeInfo = ""
-				if (videoAnalysis.season && videoAnalysis.episode) {
-					episodeInfo = `S${videoAnalysis.season}E${videoAnalysis.episode}`
-				} else if (videoAnalysis.season) {
-					episodeInfo = `Season ${videoAnalysis.season}`
-				} else if (videoAnalysis.episode) {
-					episodeInfo = `Episode ${videoAnalysis.episode}`
-				}
-
-				state = episodeInfo || "TV Show"
-			} else {
-				// Movie: Movie title as details, type as state
-				details = videoAnalysis.title
-				state = "Movie"
-			}
-		}
-
-		details = this.formatText(details)
-		state = this.formatText(state)
+		const videoCover = await this.resolveVideoCover(detectedInfo, mediaType)
+		const { details, state } = this.buildPresenceText(
+			detectedInfo,
+			config,
+			activityType,
+			videoCover?.canonicalTitle || undefined,
+		)
 
 		const presenceData = await this.buildBasePresence(
 			detectedInfo,
@@ -312,6 +327,7 @@ class PausedState extends MediaState {
 			details,
 			state,
 			config.pausedImage,
+			videoCover,
 		)
 
 		const activityName = activityType === ActivityType.Watching ? "Watching" : "Listening to"

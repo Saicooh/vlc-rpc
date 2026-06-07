@@ -1,28 +1,22 @@
 import { Input } from "@renderer/components/ui/input"
-import {
-	LAYOUT_PRESETS,
-	MUSIC_TEMPLATE_VARS,
-	VIDEO_TEMPLATE_VARS,
-	applyTemplate,
-} from "@shared/constants/layouts"
-import type { LayoutPreset, PresenceLayout } from "@shared/types"
-import { useState } from "react"
+import { MUSIC_TEMPLATE_VARS, VIDEO_TEMPLATE_VARS, applyTemplate } from "@shared/constants/layouts"
+import type { PresenceLayout } from "@shared/types"
+import { DiscordPreview } from "./discord-preview"
+
+type LayoutEditorTab = "music" | "video"
+type TemplateFieldName = "musicDetails" | "musicState" | "videoDetails" | "videoState"
 
 interface LayoutEditorProps {
 	layout: PresenceLayout
-	preset: LayoutPreset
+	activeTab: LayoutEditorTab
 	onLayoutChange: (layout: PresenceLayout) => void
-	onPresetChange: (preset: LayoutPreset) => void
 }
 
 export function LayoutEditor({
 	layout,
-	preset,
+	activeTab,
 	onLayoutChange,
-	onPresetChange,
 }: LayoutEditorProps): JSX.Element {
-	const [activeTab, setActiveTab] = useState<"music" | "video">("music")
-
 	const musicExampleData = {
 		title: "Bohemian Rhapsody",
 		artist: "Queen",
@@ -37,43 +31,11 @@ export function LayoutEditor({
 		episode: "14",
 	}
 
-	const presets: Array<{ value: LayoutPreset; label: string; description: string }> = [
-		{
-			value: "default",
-			label: "Default",
-			description: 'Music: "Song by Artist" • Video: "Show - Episode"',
-		},
-		{
-			value: "album-focused",
-			label: "Album Focused",
-			description: 'Music: "Album / Song • Artist" • Video: "Show - Episode"',
-		},
-		{
-			value: "artist-spotlight",
-			label: "Artist Spotlight",
-			description: 'Music: "Artist / • Song" • Video: "Show - Episode"',
-		},
-	]
-
-	const handlePresetChange = (newPreset: LayoutPreset): void => {
-		onPresetChange(newPreset)
-		onLayoutChange(LAYOUT_PRESETS[newPreset])
-	}
-
-	const handleTemplateChange = (field: keyof PresenceLayout, value: string): void => {
+	const handleTemplateChange = (field: TemplateFieldName, value: string): void => {
 		onLayoutChange({
 			...layout,
 			[field]: value,
 		})
-		if (preset !== "default") {
-			const matchesPreset = Object.entries(LAYOUT_PRESETS).some(([, presetLayout]) => {
-				const updatedLayout = { ...layout, [field]: value }
-				return JSON.stringify(updatedLayout) === JSON.stringify(presetLayout)
-			})
-			if (!matchesPreset) {
-				onPresetChange("default")
-			}
-		}
 	}
 
 	const musicPreviewDetails = applyTemplate(layout.musicDetails, musicExampleData)
@@ -82,56 +44,7 @@ export function LayoutEditor({
 	const videoPreviewState = applyTemplate(layout.videoState, videoExampleData)
 
 	return (
-		<div className="space-y-4">
-			{/* Preset Selector */}
-			<div>
-				<div className="text-sm font-medium mb-2">Layout Preset</div>
-				<div className="grid grid-cols-1 gap-2">
-					{presets.map((p) => (
-						<button
-							key={p.value}
-							type="button"
-							onClick={() => handlePresetChange(p.value)}
-							className={`text-left p-3 rounded-md border transition-colors ${
-								preset === p.value
-									? "border-primary bg-primary/10"
-									: "border-border hover:border-primary/50"
-							}`}
-						>
-							<div className="font-medium text-sm">{p.label}</div>
-							<div className="text-xs text-muted-foreground mt-1">{p.description}</div>
-						</button>
-					))}
-				</div>
-			</div>
-
-			{/* Tab Selector */}
-			<div className="flex gap-2 border-b border-border">
-				<button
-					type="button"
-					onClick={() => setActiveTab("music")}
-					className={`px-4 py-2 font-medium text-sm transition-colors ${
-						activeTab === "music"
-							? "border-b-2 border-primary text-primary"
-							: "text-muted-foreground hover:text-foreground"
-					}`}
-				>
-					Music
-				</button>
-				<button
-					type="button"
-					onClick={() => setActiveTab("video")}
-					className={`px-4 py-2 font-medium text-sm transition-colors ${
-						activeTab === "video"
-							? "border-b-2 border-primary text-primary"
-							: "text-muted-foreground hover:text-foreground"
-					}`}
-				>
-					Video
-				</button>
-			</div>
-
-			{/* Music Tab */}
+		<div className="space-y-5">
 			{activeTab === "music" && (
 				<div className="space-y-4">
 					<div>
@@ -166,24 +79,20 @@ export function LayoutEditor({
 						</div>
 					</div>
 
-					{/* Preview */}
-					<div className="bg-background border border-border rounded-md p-4">
-						<div className="text-xs text-muted-foreground mb-2">Preview:</div>
-						<div className="flex items-start gap-3">
-							<div className="w-16 h-16 bg-primary/20 rounded-md flex items-center justify-center text-2xl">
-								🎵
-							</div>
-							<div className="flex-1 min-w-0">
-								<div className="text-sm font-semibold mb-1">Listening to Spotify</div>
-								<div className="text-sm font-medium truncate">{musicPreviewDetails}</div>
-								<div className="text-xs text-muted-foreground truncate">{musicPreviewState}</div>
-							</div>
-						</div>
+					<div>
+						<div className="text-xs text-muted-foreground mb-2">Live Preview</div>
+						<DiscordPreview
+							activityName="Queen"
+							details={musicPreviewDetails}
+							state={musicPreviewState}
+							supportingText="A Night at the Opera"
+							artworkUrl={null}
+							mediaKind="music"
+						/>
 					</div>
 				</div>
 			)}
 
-			{/* Video Tab */}
 			{activeTab === "video" && (
 				<div className="space-y-4">
 					<div>
@@ -218,37 +127,31 @@ export function LayoutEditor({
 						</div>
 					</div>
 
-					{/* Preview */}
-					<div className="bg-background border border-border rounded-md p-4">
-						<div className="text-xs text-muted-foreground mb-2">Preview:</div>
-						<div className="flex items-start gap-3">
-							<div className="w-16 h-16 bg-primary/20 rounded-md flex items-center justify-center text-2xl">
-								🎬
-							</div>
-							<div className="flex-1 min-w-0">
-								<div className="text-sm font-semibold mb-1">Watching VLC Media Player</div>
-								<div className="text-sm font-medium truncate">{videoPreviewDetails}</div>
-								<div className="text-xs text-muted-foreground truncate">{videoPreviewState}</div>
-							</div>
-						</div>
+					<div>
+						<div className="text-xs text-muted-foreground mb-2">Live Preview</div>
+						<DiscordPreview
+							activityName="Watching VLC Media Player"
+							details={videoPreviewDetails}
+							state={videoPreviewState}
+							supportingText="2013"
+							artworkUrl={null}
+							mediaKind="video"
+						/>
 					</div>
 				</div>
 			)}
 
-			{/* Template Variables Guide */}
 			<div className="bg-muted/50 rounded-md p-3 text-xs">
-				<div className="font-medium mb-1">💡 Template Variables Guide</div>
-				<div className="space-y-1 text-muted-foreground">
-					<div>
-						• Use variables like {"{title}"}, {"{artist}"}, {"{album}"} for music
-					</div>
-					<div>
-						• Use {"{title}"}, {"{episodeInfo}"}, {"{year}"} for videos
-					</div>
-					<div>
-						• Combine them with text: "{"{title}"} - {"{artist}"}"
-					</div>
-					<div>• Unused variables will be removed automatically</div>
+				<div className="font-medium mb-2">Template Variables</div>
+				<div className="grid grid-cols-1 gap-2 text-muted-foreground">
+					{Object.entries(activeTab === "music" ? MUSIC_TEMPLATE_VARS : VIDEO_TEMPLATE_VARS).map(
+						([name, description]) => (
+							<div key={name} className="flex items-center justify-between gap-3">
+								<code className="rounded bg-background px-1.5 py-0.5 text-foreground">{`{${name}}`}</code>
+								<span className="text-right">{description}</span>
+							</div>
+						),
+					)}
 				</div>
 			</div>
 		</div>

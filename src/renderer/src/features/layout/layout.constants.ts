@@ -8,6 +8,10 @@ export interface LayoutCardData {
 		details: string
 		state: string
 	}
+	videoExample: {
+		details: string
+		state: string
+	}
 }
 
 export const LAYOUT_CARDS: LayoutCardData[] = [
@@ -19,6 +23,10 @@ export const LAYOUT_CARDS: LayoutCardData[] = [
 			details: "Bohemian Rhapsody",
 			state: "by Queen",
 		},
+		videoExample: {
+			details: "Breaking Bad",
+			state: "S05E14",
+		},
 	},
 	{
 		preset: "album-focused",
@@ -27,6 +35,10 @@ export const LAYOUT_CARDS: LayoutCardData[] = [
 		musicExample: {
 			details: "A Night at the Opera",
 			state: "Bohemian Rhapsody • Queen",
+		},
+		videoExample: {
+			details: "Breaking Bad",
+			state: "S05E14",
 		},
 	},
 	{
@@ -37,6 +49,10 @@ export const LAYOUT_CARDS: LayoutCardData[] = [
 		musicExample: {
 			details: "Queen",
 			state: "• Bohemian Rhapsody",
+		},
+		videoExample: {
+			details: "Breaking Bad",
+			state: "S05E14",
 		},
 	},
 ]
