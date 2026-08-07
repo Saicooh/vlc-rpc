@@ -318,6 +318,13 @@ export class VideoAnalyzerService {
 			/[\s\-–—]+(Capitulo|Capítulo|Episode|Episodio|Ep|Cap|Part|Parte)\s*\d+$/gi,
 			"",
 		)
+		// Also strip orphaned episode keywords left behind when the parser already
+		// extracted the episode number (e.g. "[TK] Inazuma Eleven - Episodio 16"
+		// → parser returns title "Inazuma Eleven - Episodio", episode 16)
+		cleaned = cleaned.replace(
+			/[\s\-–—]+(Capitulo|Capítulo|Episode|Episodio|Ep|Cap|Part|Parte)\s*$/gi,
+			"",
+		)
 		// Remove separated padded 2/3-digit episode numbers like " - 01", " - 12", " — 005"
 		// or raw zero-padded like " 01" without matching "Mob Psycho 100" or "Jujutsu Kaisen 0"
 		cleaned = cleaned.replace(/\s+[-–—]+\s*\d{1,4}$/, "")
