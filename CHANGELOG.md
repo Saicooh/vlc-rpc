@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.2.0
+
+### Minor Changes
+
+- Add video presence layout with AniList matching, extract AniList matcher into pure tested module, and implement VideoAnalyzerService to parse and sanitize video metadata and filenames
+
 ## 4.1.1
 
 ### Patch Changes
