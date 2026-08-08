@@ -1,9 +1,9 @@
 # VLC Discord Rich Presence
 
-[![Windows](https://img.shields.io/badge/Windows-0078d4?style=flat&logo=windows&logoColor=white)](https://github.com/valentin-marquez/vlc-rpc/releases)
-[![Release](https://img.shields.io/github/v/release/valentin-marquez/vlc-rpc?style=flat)](https://github.com/valentin-marquez/vlc-rpc/releases)
-[![Downloads](https://img.shields.io/github/downloads/valentin-marquez/vlc-rpc/total?style=flat)](https://github.com/valentin-marquez/vlc-rpc/releases)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
+[![Windows](https://img.shields.io/badge/Windows-0078d4?style=flat&logo=windows&logoColor=white)](https://github.com/Saicooh/vlc-rpc/releases)
+[![Release](https://img.shields.io/github/v/release/Saicooh/vlc-rpc?style=flat)](https://github.com/Saicooh/vlc-rpc/releases)
+[![Downloads](https://img.shields.io/github/downloads/Saicooh/vlc-rpc/total?style=flat)](https://github.com/Saicooh/vlc-rpc/releases)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat)](LICENSE)
 
 > Show your friends what you're watching or listening to in VLC directly on Discord.
 
@@ -45,14 +45,14 @@ This fork significantly enhances the original `vlc-rpc` capabilities by adding d
 
 ### Option 1: Setup Installer (Recommended)
 
-1. Download `vlc-rpc-x.x.x-setup.exe` from [Releases](https://github.com/valentin-marquez/vlc-rpc/releases)
+1. Download `vlc-rpc-x.x.x-setup.exe` from [Releases](https://github.com/Saicooh/vlc-rpc/releases)
 2. Run the installer
 3. Launch VLC Discord RP
 4. The app will configure VLC automatically
 
 ### Option 2: Portable Version
 
-1. Download `vlc-rpc-x.x.x-portable.exe` from [Releases](https://github.com/valentin-marquez/vlc-rpc/releases)
+1. Download `vlc-rpc-x.x.x-portable.exe` from [Releases](https://github.com/Saicooh/vlc-rpc/releases)
 2. Run the executable (no installation required)
 3. Configure VLC when prompted
 
@@ -115,7 +115,7 @@ Please ensure your PR includes a changeset for any user-facing changes.
 
 ## Support
 
-Found a bug or have a feature request? [Open an issue](https://github.com/valentin-marquez/vlc-rpc/issues) on GitHub.
+Found a bug or have a feature request? [Open an issue](https://github.com/Saicooh/vlc-rpc/issues) on GitHub.
 
 If you enjoy this project and want to support its development:
 
