@@ -120,16 +120,28 @@ export function AppSettingsPanel({ config }: AppSettingsPanelProps): JSX.Element
 					{config.customButtonEnabled && (
 						<div className="space-y-3 pt-2 border-t border-border">
 							<div className="space-y-1">
-								<label className="text-xs font-medium text-muted-foreground">Button Label</label>
+								<label
+									htmlFor="custom-button-label"
+									className="text-xs font-medium text-muted-foreground"
+								>
+									Button Label
+								</label>
 								<Input
+									id="custom-button-label"
 									defaultValue={config.customButtonLabel || "My Profile"}
 									onBlur={(e) => saveConfig("customButtonLabel", e.target.value)}
 									placeholder="My Profile"
 								/>
 							</div>
 							<div className="space-y-1">
-								<label className="text-xs font-medium text-muted-foreground">Button URL</label>
+								<label
+									htmlFor="custom-button-url"
+									className="text-xs font-medium text-muted-foreground"
+								>
+									Button URL
+								</label>
 								<Input
+									id="custom-button-url"
 									defaultValue={config.customButtonUrl || ""}
 									onBlur={(e) => saveConfig("customButtonUrl", e.target.value)}
 									placeholder="https://anilist.co/user/..."
