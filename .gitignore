@@ -4,7 +4,10 @@ out
 out-test
 .DS_Store
 .eslintcache
-*.log*
+# Narrow on purpose: *.log* also swallowed source files whose name contains
+# ".log", and an ignored file is added by git add -A in silence.
+*.log
+*.log.[0-9]*
 .tsbuildinfo-web
 .tsbuildinfo-node
 
@@ -12,6 +15,24 @@ out-test
 .agents/
 AGENTS.md
 skills-lock.json
-
 # SDD / Agent Teams
 .atl/
+
+# Screenshot and browser automation debris. Nothing legitimate is a PNG at the repo root.
+/*.png
+/.playwright-mcp/
+
+# Third party binary, fetched per build by scripts/fetch-fpcalc.mjs
+/resources/bin/
+
+# Build time secrets. Vite also loads .env.<mode> and .env.<mode>.local, and a
+# production build runs in production mode, so cover the whole family.
+.env
+.env.*
+!.env.example
+
+# Vite writes its config here while it builds and leaves it behind when a build dies.
+electron.vite.config.*.mjs
+
+# Bun writes the text lockfile; a CI with an older bun leaves this one behind.
+bun.lockb

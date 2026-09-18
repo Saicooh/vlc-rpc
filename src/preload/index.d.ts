@@ -1,7 +1,14 @@
 import type { ElectronAPI } from "@electron-toolkit/preload"
-import type { AppConfig, VlcConfig } from "@shared/types"
-import type { DetectedMediaInfo } from "@shared/types/media"
-import type { VlcConnectionStatus, VlcStatus } from "@shared/types/vlc"
+import type { AppConfig, VlcConfig } from "@shared/config/app-config"
+import type { OverrideDraft, OverrideListEntry, OverrideSaveResult } from "@shared/ipc/channels"
+import type { DetectedMediaInfo } from "@shared/media/media.types"
+import type { LastSentPresence } from "@shared/presence/presence.types"
+import type {
+	UpdateAvailability,
+	UpdateCheckResult,
+	UpdateInstallKind,
+} from "@shared/updates/update.types"
+import type { VlcConnectionStatus, VlcStatus } from "@shared/vlc/vlc.types"
 
 declare global {
 	interface Window {
@@ -32,12 +39,18 @@ declare global {
 				startUpdateLoop: () => Promise<boolean>
 				stopUpdateLoop: () => Promise<boolean>
 				reconnect: () => Promise<boolean>
+				getLastPresence: () => Promise<LastSentPresence>
 			}
 			media: {
 				getMediaInfo: () => Promise<(VlcStatus & DetectedMediaInfo) | null>
 			}
 			image: {
 				getAsDataUrl: (url: string) => Promise<string | null>
+			}
+			overrides: {
+				list: () => Promise<OverrideListEntry[]>
+				save: (key: string, override: OverrideDraft) => Promise<OverrideSaveResult>
+				remove: (key: string) => Promise<boolean>
 			}
 			app: {
 				minimize: () => Promise<void>
@@ -49,18 +62,18 @@ declare global {
 				onMaximizedChange: (callback: (isMaximized: boolean) => void) => () => void
 			}
 			update: {
-				check: (silent?: boolean) => Promise<boolean>
+				check: () => Promise<UpdateCheckResult>
 				download: () => Promise<boolean>
-				forceCheck: () => Promise<boolean>
 				getStatus: () => Promise<{
 					isPortable: boolean
 					updateCheckInProgress: boolean
 					retryCount: number
 					currentVersion: string
 				}>
-				getInstallationType: () => Promise<"portable" | "setup">
-				openCacheFolder: () => Promise<void>
-				onUpdateStatus: (callback: (event: string, data: unknown) => void) => () => void
+				getCurrent: () => Promise<UpdateAvailability>
+				getInstallationType: () => Promise<UpdateInstallKind>
+				openReleasePage: () => Promise<void>
+				onAvailability: (callback: (availability: UpdateAvailability) => void) => () => void
 			}
 		}
 	}

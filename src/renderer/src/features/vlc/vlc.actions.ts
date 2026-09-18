@@ -1,8 +1,9 @@
 import { updateFromVlcStatus } from "@renderer/features/media/media.actions"
 import { refreshMediaInfo } from "@renderer/features/media/media.actions"
 import { logger } from "@renderer/lib/utils"
-import type { VlcConfig } from "@shared/types"
-import { vlcConfigStore, vlcErrorStore, vlcStatusStore } from "./vlc.store"
+import type { VlcConfig } from "@shared/config/app-config"
+import { DEFAULT_CONFIG } from "@shared/config/defaults"
+import { vlcConfigStore, vlcConnectionReasonStore, vlcStatusStore } from "./vlc.store"
 
 let statusPollingInterval: ReturnType<typeof setInterval> | null = null
 
@@ -16,7 +17,6 @@ export async function loadVlcConfig(): Promise<VlcConfig | null> {
 		return config
 	} catch (error) {
 		logger.error(`Failed to load VLC configuration: ${error}`)
-		vlcErrorStore.set("Failed to load VLC configuration")
 		return null
 	}
 }
@@ -30,19 +30,16 @@ export async function saveVlcConfig(config: VlcConfig): Promise<VlcConfig | null
 			const updatedConfig = await window.api.vlc.getConfig()
 			vlcConfigStore.set(updatedConfig)
 			vlcStatusStore.set("connected")
-			vlcErrorStore.set(null)
 			logger.info("VLC configuration saved and connected")
 
 			startStatusPolling()
 			return updatedConfig
 		}
 		vlcStatusStore.set("error")
-		vlcErrorStore.set("Failed to connect to VLC")
 		logger.error("Failed to save VLC configuration")
 		return null
 	} catch (error) {
 		vlcStatusStore.set("error")
-		vlcErrorStore.set("An error occurred while saving VLC configuration")
 		logger.error(`Error saving VLC configuration: ${error}`)
 		return null
 	}
@@ -51,28 +48,35 @@ export async function saveVlcConfig(config: VlcConfig): Promise<VlcConfig | null
 export async function checkVlcConnection(): Promise<boolean> {
 	try {
 		const status = await window.api.vlc.checkStatus()
+		vlcConnectionReasonStore.set(status.reason)
 
 		if (status.isRunning) {
 			vlcStatusStore.set("connected")
-			vlcErrorStore.set(null)
 			startStatusPolling()
 			return true
 		}
 		vlcStatusStore.set("disconnected")
-		vlcErrorStore.set(status.message)
-
 		updateFromVlcStatus(null)
 
 		return false
 	} catch (error) {
 		vlcStatusStore.set("error")
-		vlcErrorStore.set("Failed to check VLC connection status")
+		vlcConnectionReasonStore.set(null)
 		logger.error(`Error checking VLC connection: ${error}`)
 		return false
 	}
 }
 
-export function startStatusPolling(interval = 2000): void {
+/**
+ * vlcrc is only read when VLC starts, so this cannot make a running VLC pick the change up:
+ * the caller still has to tell the user to restart it.
+ */
+export async function repairVlcConfig(): Promise<boolean> {
+	const current = vlcConfigStore.get() ?? DEFAULT_CONFIG.vlc
+	return (await saveVlcConfig({ ...current, httpEnabled: true })) !== null
+}
+
+function startStatusPolling(interval = 2000): void {
 	if (statusPollingInterval) {
 		clearInterval(statusPollingInterval)
 	}
@@ -82,15 +86,7 @@ export function startStatusPolling(interval = 2000): void {
 	logger.info(`VLC status polling started (${interval}ms)`)
 }
 
-export function stopStatusPolling(): void {
-	if (statusPollingInterval) {
-		clearInterval(statusPollingInterval)
-		statusPollingInterval = null
-		logger.info("VLC status polling stopped")
-	}
-}
-
-export async function refreshVlcStatus(): Promise<void> {
+async function refreshVlcStatus(): Promise<void> {
 	if (vlcStatusStore.get() === "disconnected") {
 		const isConnected = await checkVlcConnection()
 		if (!isConnected) return

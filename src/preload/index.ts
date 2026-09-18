@@ -1,16 +1,13 @@
 import { electronAPI } from "@electron-toolkit/preload"
+import type { UpdateAvailability } from "@shared/updates/update.types"
 import { contextBridge } from "electron"
-import { exposeConf } from "electron-conf/preload"
 import { exposeLogger } from "electron-winston/preload"
 import { onEvent, typedInvoke } from "./typed-bridge"
 
-// Expose electron-conf to renderer
-exposeConf()
-
-// Expose electron-winston to renderer
+// The renderer logs through electron-winston, and reads config through the
+// typed bridge below rather than through electron-conf's own renderer client.
 exposeLogger()
 
-// Custom APIs for renderer
 const api = {
 	config: {
 		get: typedInvoke("config:get"),
@@ -33,12 +30,18 @@ const api = {
 		startUpdateLoop: typedInvoke("discord:start-loop"),
 		stopUpdateLoop: typedInvoke("discord:stop-loop"),
 		reconnect: typedInvoke("discord:reconnect"),
+		getLastPresence: typedInvoke("discord:presence:last"),
 	},
 	media: {
 		getMediaInfo: typedInvoke("media:get-info"),
 	},
 	image: {
 		getAsDataUrl: typedInvoke("image:proxy"),
+	},
+	overrides: {
+		list: typedInvoke("overrides:list"),
+		save: typedInvoke("overrides:save"),
+		remove: typedInvoke("overrides:delete"),
 	},
 	app: {
 		minimize: typedInvoke("window:minimize"),
@@ -54,30 +57,16 @@ const api = {
 	update: {
 		check: typedInvoke("update:check"),
 		download: typedInvoke("update:download"),
-		forceCheck: typedInvoke("update:force-check"),
 		getStatus: typedInvoke("update:status"),
+		getCurrent: typedInvoke("update:current"),
 		getInstallationType: typedInvoke("update:installation-type"),
-		openCacheFolder: typedInvoke("update:open-cache-folder"),
-		onUpdateStatus: (callback: (event: string, data: unknown) => void) => {
-			const unsubs = [
-				onEvent("update:checking-for-update", (data) => callback("checking-for-update", data)),
-				onEvent("update:update-available", (data) => callback("update-available", data)),
-				onEvent("update:update-not-available", (data) => callback("update-not-available", data)),
-				onEvent("update:download-progress", (data) => callback("download-progress", data)),
-				onEvent("update:update-downloaded", (data) => callback("update-downloaded", data)),
-				onEvent("update:error", (data) => callback("error", data)),
-			]
-
-			return () => {
-				for (const unsub of unsubs) unsub()
-			}
+		openReleasePage: typedInvoke("update:open-release-page"),
+		onAvailability: (callback: (availability: UpdateAvailability) => void) => {
+			return onEvent("update:availability", callback)
 		},
 	},
 }
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
 if (process.contextIsolated) {
 	try {
 		contextBridge.exposeInMainWorld("electron", electronAPI)

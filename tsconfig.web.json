@@ -7,7 +7,7 @@
 		"src/preload/*.d.ts",
 		"src/shared/**/*"
 	],
-	"exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"],
+	"exclude": ["node_modules"],
 	"compilerOptions": {
 		"composite": true,
 		"jsx": "react-jsx",
@@ -20,6 +20,10 @@
 		"incremental": true,
 		"tsBuildInfoFile": "./.tsbuildinfo-web",
 		"skipLibCheck": true,
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true
 	}
 }
