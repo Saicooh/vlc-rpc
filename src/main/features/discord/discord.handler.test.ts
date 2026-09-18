@@ -254,7 +254,7 @@ describe("DiscordRpcHandler update loop", () => {
 		expect(discord.calls.update).toBe(2)
 	})
 
-	it("clamps a stale, pre-existing presenceUpdateInterval of 1ms up to the 500ms floor", async () => {
+	it("clamps a stale, pre-existing presenceUpdateInterval of 1 up to the 1500ms floor", async () => {
 		mockPresenceUpdateInterval.value = 1
 		vi.useFakeTimers()
 		const setIntervalSpy = vi.spyOn(global, "setInterval")
@@ -264,7 +264,7 @@ describe("DiscordRpcHandler update loop", () => {
 
 		handler.startUpdateLoop()
 
-		const intervalCall = setIntervalSpy.mock.calls.find(([, ms]) => ms === 500)
+		const intervalCall = setIntervalSpy.mock.calls.find(([, ms]) => ms === 1500)
 		expect(intervalCall).toBeDefined()
 
 		setIntervalSpy.mockRestore()

@@ -83,7 +83,8 @@ export class DiscordRpcHandler {
 
 	private pollIntervalMs(): number {
 		const configured = configService.get("presenceUpdateInterval")
-		return Math.max(500, Math.min(10000, configured || 1500))
+		const raw = typeof configured === "number" && configured <= 10 ? configured * 1000 : configured
+		return Math.max(1500, Math.min(10000, raw || 1500))
 	}
 
 	public startUpdateLoop(): boolean {
