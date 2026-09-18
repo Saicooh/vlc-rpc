@@ -7,6 +7,28 @@
 
 Shows what you are playing in VLC on your Discord profile, with the cover art when it can find one.
 
+## Saicooh fork additions
+
+This fork keeps the upstream VLC Discord RP foundation and adds a more capable video catalog and
+presence pipeline:
+
+- **Anime-aware filename parsing.** Handles release groups, `SxxExx` seasons and episodes, absolute
+  episode numbers, subtitles, years, underscores, and release descriptors such as `Movie`, `SP`,
+  `OVA`, and `ONA`.
+- **Stronger AniList matching.** Uses title aliases, subtitle-aware search candidates, release-name
+  cleanup, and safer scoring so common fansub names resolve to the right anime.
+- **Western TV metadata.** Series that AniList does not contain can use TVMaze for a canonical title,
+  poster, and source link. Google Images remains the fallback when a public catalog has no match.
+- **Video source buttons.** Resolved videos can expose links to AniList, TVMaze, or IMDb in Discord.
+  The optional custom profile button is shown for AniList-identified anime, not unrelated western TV.
+- **Syncplay presence.** Detects an active Syncplay session and changes the Discord presence indicator
+  to show that playback is shared.
+- **Better VLC metadata handling.** Keeps VLC's real filename separate from its display title, which
+  makes catalog parsing reliable even when VLC reports a shortened or cleaned title.
+
+The upstream project is [VLC Discord RP](https://github.com/valentin-marquez/vlc-rpc). This fork is
+published at [Saicooh/vlc-rpc](https://github.com/Saicooh/vlc-rpc).
+
 VLC already exposes everything it knows over a local HTTP interface. This app reads that, works out
 what the file actually is, looks for artwork, and hands the result to Discord. The interesting part
 is the middle step, because a file on disk is usually called something like
@@ -23,7 +45,7 @@ graph LR
     A[VLC Media Player] -->|HTTP interface| B[VLC Discord RP]
     B -->|filename and tags| D[Identification]
     D -->|title, season, episode| B
-    D -->|cover art lookup| E[AniList / iTunes / MusicBrainz]
+    D -->|cover art lookup| E[AniList / TVMaze / Google Images / iTunes / MusicBrainz]
     B -->|Rich Presence| C[Discord]
 ```
 
@@ -45,7 +67,8 @@ cover than the wrong one, so a weak match is discarded.
 | Audio with usable tags | iTunes Search, then MusicBrainz and the Cover Art Archive | No |
 | Audio with no usable tags | The sound itself, see below | No |
 | Anime | AniList | No |
-| Films and western television | Nothing automatic, see Limitations | No |
+| Western television | TVMaze, then Google Images | No |
+| Films | AniList for anime films, then Google Images | No |
 
 A file ripped from YouTube usually has no artist and a title that is really its
 filename, so no text search can find it. For those the app computes an acoustic
@@ -101,8 +124,8 @@ what you want when you are watching something you would rather not broadcast.
 
 A new release announces itself with a button in the window header, next to the VLC and Discord
 chips, and there is nothing there the rest of the time, so an empty header means you are current.
-An installed copy reads "Update to 5.0.0", downloads it and restarts to finish. A portable copy
-reads "Get 5.0.0" and opens the release page, because a portable build cannot replace the file it
+An installed copy reads "Update to 5.0.1", downloads it and restarts to finish. A portable copy
+reads "Get 5.0.1" and opens the release page, because a portable build cannot replace the file it
 is running from. While it downloads, the button becomes the version and the percent. If you would
 rather ask than wait, Settings has a "Check for updates" button under About, which answers next to
 the version it checked.
@@ -147,11 +170,10 @@ Saved corrections are listed in Settings, where you can see what each one applie
 
 These are real, and worth knowing before you file a bug.
 
-**There is no automatic cover for films or western television.** Not because it is unfinished, but
-because there is no source for it that works without credentials. Film posters are studio property,
-and every catalogue that carries them puts an API key in front, usually behind an application form.
-Anime works because AniList is open. Music works because iTunes and MusicBrainz are open. For
-everything else, corrections are the answer, and they exist for exactly this reason.
+**Non-anime video lookups are best effort.** TVMaze provides public metadata and posters for many
+western series without credentials. Films and series that TVMaze cannot identify fall back to a
+Google Images lookup, with an IMDb search link when an image is found. A correction is still the
+reliable answer when a title has an unusual name or the public sources disagree.
 
 **Embedded cover art is uploaded to a public file host.** To show the artwork inside your audio
 files, the app uploads that image to five temporary hosts at once (x0.at, catbox.moe, uguu.se,
@@ -185,7 +207,7 @@ builds are produced or tested.
 ## Technical notes
 
 Electron with TypeScript throughout, React in the renderer, built with electron-vite, linted and
-formatted with Biome, tested with Vitest. The package manager is bun.
+formatted with Biome, tested with Vitest. The package manager is Bun 1.4.2.
 
 The main process is organised by feature rather than by layer. Each folder under
 `src/main/features/` owns its own types, handlers and services, and `src/main/main.ts` is a

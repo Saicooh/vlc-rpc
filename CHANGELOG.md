@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.0.1
+
+### Fork additions
+
+- Added robust anime filename parsing and AniList matching for release groups, absolute episodes,
+  subtitles, underscores, and common format descriptors.
+- Added TVMaze metadata and poster lookup for western television, with Google Images fallback.
+- Added source links, anime-only custom profile buttons, and Syncplay-aware presence indicators.
+
 ## 5.0.0
 
 ### Major Changes
