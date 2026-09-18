@@ -1,4 +1,4 @@
 provider: github
-owner: valentin-marquez
+owner: Saicooh
 repo: vlc-rpc
 updaterCacheDirName: vlc-rpc-updater

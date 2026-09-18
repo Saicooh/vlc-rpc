@@ -38,7 +38,7 @@ export class ImageProxy {
 				logger.info(`Fetching remote image: ${this.sanitizeUrl(source)}`)
 				const response = await fetch(source, {
 					headers: {
-						"User-Agent": "VLC-Discord-RP/3.0 (https://github.com/valeriko777/vlc-discord-rp)",
+						"User-Agent": "VLC-Discord-RP/5.0 (https://github.com/Saicooh/vlc-rpc)",
 					},
 				})
 

@@ -473,7 +473,7 @@ describe("A portable copy", () => {
 		expect(updaterMock.autoUpdater.downloadUpdate).not.toHaveBeenCalled()
 		expect(electronMock.openExternal).toHaveBeenCalledTimes(1)
 		expect(String(electronMock.openExternal.mock.calls[0]?.[0])).toContain(
-			"github.com/valentin-marquez/vlc-rpc/releases",
+			"github.com/Saicooh/vlc-rpc/releases",
 		)
 	})
 

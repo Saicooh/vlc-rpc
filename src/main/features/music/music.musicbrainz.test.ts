@@ -60,7 +60,7 @@ describe("MusicBrainzProvider", () => {
 		await provider.search(TRACK)
 
 		expect(requests[0]?.headers["User-Agent"]).toBe(
-			"vlc-rpc/4.1.0 ( https://github.com/Valentin-Marquez/vlc-rpc )",
+			"vlc-rpc/4.1.0 ( https://github.com/Saicooh/vlc-rpc )",
 		)
 	})
 

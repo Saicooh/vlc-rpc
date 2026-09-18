@@ -25,7 +25,7 @@ const OPEN_WINDOW_GAP_MS = 30 * 60 * 1000
 /** Three attempts spread over twenty minutes, then wait for the next cadence. */
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 15 * 60_000]
 
-const RELEASES_URL = "https://github.com/valentin-marquez/vlc-rpc/releases/latest"
+const RELEASES_URL = "https://github.com/Saicooh/vlc-rpc/releases/latest"
 
 /**
  * What the updater is busy with. A check that overlaps another wastes a

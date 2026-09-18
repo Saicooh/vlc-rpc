@@ -41,14 +41,9 @@ function tempFileExpiry(expiryHours: number): number {
 }
 
 export class Uploader {
-	private readonly appVersion = "4.0.2"
+	private readonly appVersion: string
 	private readonly appName = "VLC-Discord-RPC"
-
-	// One honest identifier for every host, replacing the rotation this class used
-	// to do. Rotating fake clients reads as human only across spaced out requests.
-	// The five now leave together from one address, where five different clients
-	// in the same instant is a stranger pattern than one client that says who it is.
-	private readonly userAgent = `${this.appName}/${this.appVersion}`
+	private readonly userAgent: string
 
 	private readonly services: ImageUploadService[] = [
 		{
@@ -87,7 +82,9 @@ export class Uploader {
 		},
 	]
 
-	constructor() {
+	constructor(appVersion = "5.0.1") {
+		this.appVersion = appVersion
+		this.userAgent = `${this.appName}/${this.appVersion}`
 		logger.info("Multi-service image uploader initialized")
 	}
 

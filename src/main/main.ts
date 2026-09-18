@@ -74,7 +74,7 @@ if (!gotTheLock) {
 		const discord = new Discord.Client(systemClock)
 		const imageProxy = new Media.ImageProxy()
 		const coverStore = new Cover.Store()
-		const coverUploader = new Cover.Uploader()
+		const coverUploader = new Cover.Uploader(app.getVersion())
 		// Asked once and answered once: the updater decides what it may offer from
 		// this, and start at login is refused for the same copies, so the header
 		// and the settings screen cannot disagree about what this copy is.

@@ -48,7 +48,7 @@ portable:
 npmRebuild: false
 publish:
   provider: github
-  owner: valentin-marquez
+  owner: Saicooh
   repo: vlc-rpc
   releaseType: release
   publishAutoUpdate: true

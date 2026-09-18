@@ -6,7 +6,7 @@ const ENDPOINT = "https://musicbrainz.org/ws/2/recording"
 const MIN_INTERVAL_MS = 1000
 const REQUEST_TIMEOUT_MS = 5000
 const RESULT_LIMIT = 5
-const CONTACT_URL = "https://github.com/Valentin-Marquez/vlc-rpc"
+const CONTACT_URL = "https://github.com/Saicooh/vlc-rpc"
 
 interface MusicBrainzArtistCredit {
 	name?: string

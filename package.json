@@ -8,10 +8,10 @@
 		"email": "valentin13.mail@gmail.com",
 		"url": "https://github.com/valentin-marquez"
 	},
-	"homepage": "https://github.com/valentin-marquez/vlc-rpc",
+	"homepage": "https://github.com/Saicooh/vlc-rpc",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/valentin-marquez/vlc-rpc.git"
+		"url": "https://github.com/Saicooh/vlc-rpc.git"
 	},
 	"license": "AGPL-3.0-only",
 	"keywords": [
