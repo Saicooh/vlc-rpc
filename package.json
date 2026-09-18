@@ -86,5 +86,5 @@
 		"vitest": "^5.0.0",
 		"wouter": "^3.9.0"
 	},
-	"packageManager": "bun@1.1.13"
+	"packageManager": "bun@1.4.2"
 }
