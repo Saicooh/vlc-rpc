@@ -12,6 +12,18 @@ describe("coverKey", () => {
 		expect(first).not.toBe(next)
 		expect(first).not.toBe(covered)
 	})
+
+	it("separates two discs whose only filename is index.bdmv", () => {
+		const one = coverKey({
+			mediaType: "video",
+			media: { filename: "index.bdmv", title: "UPXX-1016" },
+		})
+		const two = coverKey({
+			mediaType: "video",
+			media: { filename: "index.bdmv", title: "ABCD-2020" },
+		})
+		expect(one).not.toBe(two)
+	})
 	it("keys audio by artist and album, not by title", () => {
 		const trackThree = coverKey({
 			media: { artist: "Christian Nodal", album: "Ahora", title: "Probablemente" },

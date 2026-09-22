@@ -42,6 +42,15 @@ function applyOverride(override: VideoOverride, parsed: ParsedVideo): CachedWork
 	}
 }
 
+function videoNameFor(status: VlcStatus): string | undefined {
+	if (isBluRaySource(status.media.sourceUri) && !bluRayFolderTitle(status.media.sourceUri)) {
+		// Every disc has an index.bdmv. Its volume label is the only identity we
+		// have for a correction; if VLC reports none, do not file one at all.
+		return status.media.title && status.media.title !== "Unknown" ? status.media.title : undefined
+	}
+	return status.media.filename || status.media.title
+}
+
 export class Resolver {
 	private readonly inflight = new Map<string, Promise<CatalogResult | null>>()
 
@@ -52,7 +61,7 @@ export class Resolver {
 	) {}
 
 	public async resolve(status: VlcStatus): Promise<CatalogResult | null> {
-		const videoName = status.media.filename || status.media.title
+		const videoName = videoNameFor(status)
 		if (status.mediaType !== "video" || !videoName) {
 			return null
 		}
@@ -108,7 +117,7 @@ export class Resolver {
 	 * form that cannot be saved.
 	 */
 	public overrideTargetFor(status: VlcStatus): OverrideTarget | null {
-		const videoName = status.media.filename || status.media.title
+		const videoName = videoNameFor(status)
 		if (status.mediaType !== "video" || !videoName) {
 			return null
 		}

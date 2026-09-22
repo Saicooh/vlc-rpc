@@ -12,7 +12,7 @@ export interface CoverKeyInput {
  */
 export function coverKey(input: CoverKeyInput): string {
 	if (input.mediaType === "video") {
-		return `video:${input.media.filename || input.media.title || "unknown"}|${input.media.artworkUrl || ""}`
+		return `video:${input.media.filename || ""}|${input.media.title || ""}|${input.media.artworkUrl || ""}`
 	}
 	const artist = input.media.artist || "unknown"
 	if (input.media.album) {

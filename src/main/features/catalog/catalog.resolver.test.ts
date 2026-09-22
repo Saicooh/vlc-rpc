@@ -104,6 +104,16 @@ function videoOverride(fields: Partial<Pick<VideoOverride, "title" | "cover" | "
 }
 
 describe("Blu-Ray disc identity", () => {
+	it("files corrections under the volume label, never the shared index.bdmv name", () => {
+		const resolver = new Resolver(fakeCache().cache, fakeProvider([]).provider, noOverrides())
+		const first = status("UPXX-1016")
+		first.media.filename = "index.bdmv"
+		first.media.sourceUri = "bluray:///D:/"
+		const second = status("ABCD-2020")
+		second.media.filename = "index.bdmv"
+		second.media.sourceUri = "bluray:///D:/"
+		expect(resolver.overrideTargetFor(first)?.key).not.toBe(resolver.overrideTargetFor(second)?.key)
+	})
 	it("does not query providers for an opaque volume label", async () => {
 		const { cache } = fakeCache()
 		const provider = fakeProvider([])
