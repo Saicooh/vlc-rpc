@@ -13,6 +13,7 @@ const CLEARED_BECAUSE: Record<PresenceClearReason, string> = {
 	"rpc-disabled": "Rich Presence is turned off",
 	"vlc-unavailable": "VLC is not reachable",
 	"playback-stopped": "VLC has nothing playing",
+	"playback-paused": "Activity is hidden while VLC is paused",
 	"loop-stopped": "Presence updates are stopped",
 }
 

@@ -36,7 +36,7 @@ export function AppSettingsPanel({
 	const [startupError, setStartupError] = useState<string | null>(null)
 
 	async function handleToggleOption(
-		option: "minimizeToTray" | "startWithSystem" | "startMinimized",
+		option: "minimizeToTray" | "startWithSystem" | "startMinimized" | "hideActivityWhenPaused",
 	): Promise<void> {
 		try {
 			if (option === "startWithSystem") {
@@ -71,6 +71,18 @@ export function AppSettingsPanel({
 
 	return (
 		<Panel label="App">
+			<Row
+				htmlFor="hideActivityWhenPaused"
+				label="Hide Discord activity while paused"
+				description="Clear your activity when you pause VLC; show it again when playback resumes."
+				control={
+					<Switch
+						id="hideActivityWhenPaused"
+						checked={config.hideActivityWhenPaused === true}
+						onChange={() => handleToggleOption("hideActivityWhenPaused")}
+					/>
+				}
+			/>
 			<Row
 				htmlFor="minimizeToTray"
 				label="Keep running in the tray when you minimize"

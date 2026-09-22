@@ -6,8 +6,9 @@ import type { VlcStatus } from "@shared/vlc/vlc.types"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Client as DiscordClient } from "./discord.client"
 
-const { mockPresenceUpdateInterval } = vi.hoisted(() => ({
+const { mockPresenceUpdateInterval, mockHideWhenPaused } = vi.hoisted(() => ({
 	mockPresenceUpdateInterval: { value: 1500 },
+	mockHideWhenPaused: { value: false },
 }))
 
 vi.mock("@main/core/logger", () => ({
@@ -19,7 +20,11 @@ vi.mock("@main/core/ipc", () => ({ registerHandler: () => {} }))
 vi.mock("@main/core/config", () => ({
 	configService: {
 		get: (key?: string) =>
-			key === "presenceUpdateInterval" ? mockPresenceUpdateInterval.value : {},
+			key === "presenceUpdateInterval"
+				? mockPresenceUpdateInterval.value
+				: key === "hideActivityWhenPaused"
+					? mockHideWhenPaused.value
+					: {},
 		set: () => {},
 		delete: () => {},
 	},
@@ -38,6 +43,7 @@ vi.mock("electron-conf/main", () => ({
 afterEach(() => {
 	vi.useRealTimers()
 	mockPresenceUpdateInterval.value = 1500
+	mockHideWhenPaused.value = false
 })
 
 import { DiscordRpcHandler } from "./discord.handler"
@@ -119,6 +125,49 @@ function fakePresence(data: DiscordPresenceData | null = PRESENCE) {
 }
 
 describe("DiscordRpcHandler update loop", () => {
+	it("clears on pause when opted in and sends again on resume", async () => {
+		vi.useFakeTimers()
+		const discord = fakeDiscord()
+		let current = status()
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => current),
+			fakePresence(),
+			new FakeClock(),
+		)
+		mockHideWhenPaused.value = true
+
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(1)
+
+		current = status({ status: "paused" })
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.clear).toBe(1)
+		expect(handler.getLastPresence()).toEqual({ kind: "cleared", reason: "playback-paused" })
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.clear).toBe(1)
+
+		current = status()
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(2)
+	})
+
+	it("continues to show paused activity by default", async () => {
+		vi.useFakeTimers()
+		const discord = fakeDiscord()
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => status({ status: "paused" })),
+			fakePresence(),
+			new FakeClock(),
+		)
+
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(1)
+		expect(discord.calls.clear).toBe(0)
+	})
 	it("sends once for the initial tick, then skips an unchanged one", async () => {
 		vi.useFakeTimers()
 		const discord = fakeDiscord()

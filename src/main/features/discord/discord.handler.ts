@@ -149,6 +149,13 @@ export class DiscordRpcHandler {
 			if (!vlcStatus) {
 				return this.pushClear("vlc-unavailable")
 			}
+			if (
+				vlcStatus.active &&
+				vlcStatus.status === "paused" &&
+				configService.get("hideActivityWhenPaused") === true
+			) {
+				return this.pushClear("playback-paused")
+			}
 
 			const window = this.timeline.update(vlcStatus)
 			const key = presenceKey(vlcStatus, this.timeline.currentEpoch)

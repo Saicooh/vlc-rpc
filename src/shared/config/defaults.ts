@@ -18,6 +18,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	startMinimized: false,
 	fileMetadata: {},
 	rpcEnabled: true,
+	hideActivityWhenPaused: false,
 	customButtonEnabled: false,
 	customButtonLabel: "My Profile",
 	customButtonUrl: "",

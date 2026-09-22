@@ -27,6 +27,8 @@ export interface AppConfig {
 	/** Keyed by file path. */
 	fileMetadata: Record<string, FileMetadata>
 	rpcEnabled: boolean
+	/** Clear the Discord activity while VLC is paused. */
+	hideActivityWhenPaused?: boolean
 	/** While this stands in the future, the presence is off whatever `rpcEnabled` says. */
 	rpcDisabledUntil?: number
 	/** Optional button shown in the Discord presence. */
