@@ -337,6 +337,7 @@ export const MUSIC_PIECES: readonly PieceInfo[] = [
 	{ name: "title", label: "Song title", noun: "song title" },
 	{ name: "artist", label: "Artist", noun: "artist" },
 	{ name: "album", label: "Album", noun: "album" },
+	{ name: "nowPlaying", label: "Now playing on radio", noun: "radio track" },
 ]
 
 export const VIDEO_PIECES: readonly PieceInfo[] = [

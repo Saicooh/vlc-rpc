@@ -14,7 +14,7 @@ import {
 import { inspectLayout } from "@shared/presence/layout-builder"
 
 import type { PreviewSample } from "../layout.constants"
-import { MUSIC_SLOTS, SAMPLE_TRACK, UNTAGGED_TRACK } from "../layout.constants"
+import { MUSIC_SLOTS, SAMPLE_RADIO, SAMPLE_TRACK, UNTAGGED_TRACK } from "../layout.constants"
 import { useLayoutDraft } from "../use-layout-draft"
 import { LayoutCanvas } from "./layout-canvas"
 
@@ -37,7 +37,12 @@ export function MusicCanvas({ config }: { config: AppConfig }): JSX.Element {
 			inSentence: isLive ? "what is playing" : "the example track",
 			isLive,
 			variables: isLive
-				? { title: media.title ?? "", artist: media.artist ?? "", album: media.album ?? "" }
+				? {
+						title: media.title ?? "",
+						artist: media.artist ?? "",
+						album: media.album ?? "",
+						nowPlaying: media.nowPlaying ?? "",
+					}
 				: SAMPLE_TRACK,
 		},
 		{
@@ -46,6 +51,13 @@ export function MusicCanvas({ config }: { config: AppConfig }): JSX.Element {
 			inSentence: "a file with no tags",
 			isLive: false,
 			variables: UNTAGGED_TRACK,
+		},
+		{
+			id: "radio",
+			label: "A radio stream",
+			inSentence: "a radio stream",
+			isLive: false,
+			variables: SAMPLE_RADIO,
 		},
 	]
 

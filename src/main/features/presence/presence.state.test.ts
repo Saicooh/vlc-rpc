@@ -629,6 +629,30 @@ describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 			expect(presence?.large_text).toBeUndefined()
 		})
 
+		it("draws the live radio track when the layout includes it", async () => {
+			withPresets({
+				layoutPreset: {
+					kind: "custom",
+					layout: {
+						activityName: [],
+						details: [valuePiece("title")],
+						state: [valuePiece("nowPlaying")],
+						largeText: [],
+					},
+				},
+			})
+			const { service } = build({ kind: "no-artwork" }, null)
+			const radio = {
+				...status(state),
+				media: { title: "Groove Salad", nowPlaying: "A new track" },
+			}
+
+			const presence = await service.getDiscordPresence(radio, timeline)
+
+			expect(presence?.details).toBe("Groove Salad")
+			expect(presence?.state).toBe("A new track")
+		})
+
 		it("shows the file name in bold when the file carries no tags", async () => {
 			const { service } = build({ kind: "no-artwork" }, null)
 

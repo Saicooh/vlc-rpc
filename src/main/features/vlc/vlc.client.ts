@@ -263,6 +263,7 @@ export class Client {
 
 			status.media.artist = meta.artist || ""
 			status.media.album = meta.album || ""
+			status.media.nowPlaying = meta.now_playing?.trim() || ""
 
 			// An image this app uploaded outranks the local one, until it expires.
 			if (meta["X-COVER-URL"]) {

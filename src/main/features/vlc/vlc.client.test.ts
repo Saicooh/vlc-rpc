@@ -122,6 +122,7 @@ describe("readStatus", () => {
 		expect(status?.playback.duration).toBe(0)
 		expect(status?.playback.time).toBe(0)
 		expect(status?.media.title).toContain("Groove Salad")
+		expect(status?.media.nowPlaying).toBe("Big Url: - Broadcasting Around The Worl")
 	})
 
 	it("maps plid and rate from the raw status", async () => {

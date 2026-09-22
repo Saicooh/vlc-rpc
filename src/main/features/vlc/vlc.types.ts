@@ -67,6 +67,7 @@ export interface VlcMetadata {
 	filename?: string
 	artist?: string
 	album?: string
+	now_playing?: string
 	artwork_url?: string
 	track_total?: string
 	copyright?: string

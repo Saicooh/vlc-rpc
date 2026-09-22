@@ -15,6 +15,7 @@ export interface VlcStatus {
 		filename?: string
 		artist?: string
 		album?: string
+		nowPlaying?: string
 		artworkUrl?: string | undefined
 	}
 	videoInfo?:

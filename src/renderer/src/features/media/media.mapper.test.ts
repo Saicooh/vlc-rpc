@@ -9,6 +9,7 @@ const EMPTY: MediaState = {
 	title: null,
 	artist: null,
 	album: null,
+	nowPlaying: null,
 	duration: null,
 	position: null,
 	artwork: null,
@@ -53,6 +54,14 @@ function resolved(): MediaState {
 }
 
 describe("mergeVlcStatus", () => {
+	it("updates the current radio track without changing the station title", () => {
+		const station = playing({ title: "Groove Salad", nowPlaying: "First track" })
+		const first = mergeVlcStatus(EMPTY, station)
+		const next = mergeVlcStatus(first, playing({ title: "Groove Salad", nowPlaying: "Next track" }))
+
+		expect(next.title).toBe("Groove Salad")
+		expect(next.nowPlaying).toBe("Next track")
+	})
 	it("takes the file's own name for a file it has not seen before", () => {
 		const state = mergeVlcStatus(EMPTY, playing({ title: "Frieren.S01E11.mkv", artist: "" }))
 

@@ -38,6 +38,13 @@ export const SAMPLE_TRACK = {
  */
 export const UNTAGGED_TRACK = { title: "track01", artist: "", album: "" }
 
+export const SAMPLE_RADIO = {
+	title: "Groove Salad",
+	artist: "",
+	album: "",
+	nowPlaying: "Big Url: Broadcasting Around The World",
+}
+
 /**
  * An arrangement only works if it reads for both, so the canvas shows an episode and a
  * film together rather than picking one.

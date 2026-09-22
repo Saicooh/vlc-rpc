@@ -141,6 +141,7 @@ function buildLines(
 		title: firstNonEmpty(corrected?.title, media.title) ?? "",
 		artist: firstNonEmpty(corrected?.artist, media.artist) ?? "",
 		album: media.album ?? "",
+		nowPlaying: media.nowPlaying ?? "",
 	}
 
 	return {

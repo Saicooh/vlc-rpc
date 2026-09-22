@@ -25,6 +25,7 @@ const NOTHING_PLAYING = {
 	title: null,
 	artist: null,
 	album: null,
+	nowPlaying: null,
 	duration: null,
 	position: null,
 	artwork: null,
@@ -57,6 +58,7 @@ export function mergeVlcStatus(previous: MediaState, status: VlcStatus | null): 
 		position: playback.time || null,
 		mediaType: status.mediaType || null,
 		fileTitle,
+		nowPlaying: media.nowPlaying || null,
 	}
 
 	if (previous.fileTitle === fileTitle) {

@@ -8,6 +8,7 @@ export interface MediaState {
 	title: string | null
 	artist: string | null
 	album: string | null
+	nowPlaying: string | null
 	duration: number | null
 	position: number | null
 	artwork: string | null
@@ -54,6 +55,7 @@ const INITIAL_STATE: MediaState = {
 	title: null,
 	artist: null,
 	album: null,
+	nowPlaying: null,
 	duration: null,
 	position: null,
 	artwork: null,
