@@ -59,7 +59,7 @@ export class Updater {
 
 		logger.info("Auto updater service initialized", {
 			installedAs: this.install.kind,
-			reason: this.install.kind === "portable" ? this.install.reason : "uninstaller-present",
+			reason: this.install.kind === "installed" ? "uninstaller-present" : this.install.reason,
 			isDev: is.dev,
 			platform: process.platform,
 			version: app.getVersion(),
@@ -340,10 +340,10 @@ export class Updater {
 	}
 
 	public downloadUpdate(): void {
-		if (this.install.kind === "portable") {
+		if (this.install.kind !== "installed") {
 			// The update feed lists the installer, so what would land in the cache
 			// is not the portable executable this copy is made of.
-			logger.info("Portable copy asked for a download, opening the release page instead")
+			logger.info("Copy without a confirmed installer asked for a download; opening releases")
 			void this.openReleasePage()
 			return
 		}
@@ -359,7 +359,7 @@ export class Updater {
 
 	/** Only an installed copy can do this: a portable one is sent to the release page. */
 	public installNow(): void {
-		if (this.install.kind === "portable") {
+		if (this.install.kind !== "installed") {
 			void this.openReleasePage()
 			return
 		}
@@ -380,7 +380,7 @@ export class Updater {
 	}
 
 	public getInstallationType(): UpdateInstallKind {
-		return this.install.kind === "portable" ? "portable" : "setup"
+		return this.install.kind === "installed" ? "setup" : this.install.kind
 	}
 
 	public getUpdateStatus(): {
@@ -390,7 +390,7 @@ export class Updater {
 		currentVersion: string
 	} {
 		return {
-			isPortable: this.install.kind === "portable",
+			isPortable: this.install.kind !== "installed",
 			updateCheckInProgress: this.phase.kind === "checking",
 			retryCount: this.retryAttempt,
 			currentVersion: app.getVersion(),

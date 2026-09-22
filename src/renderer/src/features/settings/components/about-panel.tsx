@@ -9,9 +9,10 @@ interface AboutPanelProps {
 	info: SystemInfo
 }
 
-const INSTALL_LABEL: Record<"portable" | "setup", string> = {
+const INSTALL_LABEL: Record<"portable" | "setup" | "unknown", string> = {
 	portable: "Portable",
 	setup: "Installer",
+	unknown: "Could not determine; updates are manual",
 }
 
 /** Where the check the user asked for has got to. */

@@ -34,7 +34,7 @@ export function SettingsPage(): JSX.Element {
 			<h1 className="sr-only">Settings</h1>
 			<AppSettingsPanel
 				config={config}
-				canStartWithSystem={system.kind === "ready" && !system.isPortable}
+				canStartWithSystem={system.kind === "ready" && system.installedAs === "setup"}
 			/>
 			<VlcConfigForm initialConfig={config.vlc} />
 			<OverridesPanel />

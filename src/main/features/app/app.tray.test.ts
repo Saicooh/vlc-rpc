@@ -93,7 +93,7 @@ class FakeClock implements Clock {
 const HALF_HOUR_MS = 30 * 60 * 1000
 
 const fakeStartup = {
-	isPortable: () => false,
+	canStartAtLogin: () => true,
 	setStartAtLogin: () => {},
 } as unknown as Startup
 

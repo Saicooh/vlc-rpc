@@ -3,7 +3,7 @@
  * copy got onto the machine, not a preference: a portable build cannot replace
  * the file it is running from.
  */
-export type UpdateInstallKind = "portable" | "setup"
+export type UpdateInstallKind = "portable" | "setup" | "unknown"
 
 /**
  * What the updater knows about a release right now. A tag rather than a bag of

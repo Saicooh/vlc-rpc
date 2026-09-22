@@ -9,6 +9,7 @@ const HOUR_MS = 60 * MINUTE_MS
 
 const INSTALLED: InstallKind = { kind: "installed" }
 const PORTABLE: InstallKind = { kind: "portable", reason: "portable-launcher" }
+const UNKNOWN: InstallKind = { kind: "unknown", reason: "no-uninstaller" }
 
 const { state, updaterMock, logCalls, electronMock } = vi.hoisted(() => {
 	const state = {
@@ -485,5 +486,21 @@ describe("A portable copy", () => {
 
 		expect(updaterMock.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
 		expect(electronMock.openExternal).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe("An unidentified copy", () => {
+	it("does not run an installer over an unknown installation", async () => {
+		const updater = new Updater(new SystemClock(), UNKNOWN)
+		expect(updater.getInstallationType()).toBe("unknown")
+		expect(updaterMock.autoUpdater.autoInstallOnAppQuit).toBe(false)
+
+		updater.downloadUpdate()
+		updater.installNow()
+		await vi.advanceTimersByTimeAsync(0)
+
+		expect(updaterMock.autoUpdater.downloadUpdate).not.toHaveBeenCalled()
+		expect(updaterMock.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+		expect(electronMock.openExternal).toHaveBeenCalledTimes(2)
 	})
 })

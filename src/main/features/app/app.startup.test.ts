@@ -25,7 +25,7 @@ import { LOGIN_LAUNCH_ARG, START_MINIMIZED_ARG, Startup, shouldStartHidden } fro
 
 const INSTALLED: InstallKind = { kind: "installed" }
 const RENAMED_PORTABLE: InstallKind = { kind: "portable", reason: "portable-launcher" }
-const UNIDENTIFIED: InstallKind = { kind: "portable", reason: "no-uninstaller" }
+const UNIDENTIFIED: InstallKind = { kind: "unknown", reason: "no-uninstaller" }
 
 beforeEach(() => {
 	electronMock.setLoginItemSettings.mockClear()
@@ -38,9 +38,9 @@ describe("Deciding whether a copy may start with Windows", () => {
 		// so an ordinary install under a folder like C:\PortableApps lost start at
 		// login. The path is not an input any more, which is what this asserts:
 		// the same process, one kind each way, two different answers.
-		expect(new Startup(INSTALLED).isPortable()).toBe(false)
-		expect(new Startup(RENAMED_PORTABLE).isPortable()).toBe(true)
-		expect(new Startup(UNIDENTIFIED).isPortable()).toBe(true)
+		expect(new Startup(INSTALLED).canStartAtLogin()).toBe(true)
+		expect(new Startup(RENAMED_PORTABLE).canStartAtLogin()).toBe(false)
+		expect(new Startup(UNIDENTIFIED).canStartAtLogin()).toBe(false)
 	})
 
 	it("writes the login item for an installed copy", () => {

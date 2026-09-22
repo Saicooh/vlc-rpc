@@ -58,7 +58,6 @@ declare global {
 				close: () => Promise<void>
 				isMaximized: () => Promise<boolean>
 				getPlatform: () => Promise<string>
-				isPortable: () => Promise<boolean>
 				setStartWithSystem: (enabled: boolean) => Promise<boolean>
 				onMaximizedChange: (callback: (isMaximized: boolean) => void) => () => void
 			}

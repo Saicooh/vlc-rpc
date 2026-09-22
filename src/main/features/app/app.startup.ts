@@ -32,8 +32,8 @@ export class Startup {
 	 */
 	constructor(private readonly install: InstallKind) {}
 
-	public isPortable(): boolean {
-		return this.install.kind === "portable"
+	public canStartAtLogin(): boolean {
+		return this.install.kind === "installed"
 	}
 
 	/** Only an installed copy can be written into the registry. */
@@ -44,8 +44,8 @@ export class Startup {
 				return false
 			}
 
-			if (this.isPortable()) {
-				logger.warn("Start at login is not available for portable version")
+			if (!this.canStartAtLogin()) {
+				logger.warn("Start at login requires a confirmed installed copy")
 				return false
 			}
 

@@ -15,16 +15,5 @@ export class AppInfoHandler {
 			configService.set("startWithSystem", enabled)
 			return true
 		})
-
-		registerHandler("app:is-portable", async () => {
-			try {
-				const isPortable = this.startup.isPortable()
-				logger.info(`App is portable: ${isPortable}`)
-				return isPortable
-			} catch (error) {
-				logger.error(`Failed to check if portable: ${error}`)
-				return false
-			}
-		})
 	}
 }

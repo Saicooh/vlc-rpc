@@ -6,7 +6,8 @@ import { join } from "node:path"
  */
 export type InstallKind =
 	| { kind: "installed" }
-	| { kind: "portable"; reason: "portable-launcher" | "no-uninstaller" }
+	| { kind: "portable"; reason: "portable-launcher" }
+	| { kind: "unknown"; reason: "no-uninstaller" }
 
 export interface InstallProbe {
 	portableLauncher: boolean
@@ -39,9 +40,8 @@ export function probeInstall(
 }
 
 /**
- * Portable is the safe answer when neither signal is present: offering a
- * manual update to someone who could have had an automatic one is a smaller
- * harm than silently running an installer over a copy that was never installed.
+ * When neither signal exists, report uncertainty and use the manual update
+ * path. A missing uninstaller must not turn into permission to run an installer.
  */
 export function detectInstallKind(probe: InstallProbe): InstallKind {
 	if (probe.portableLauncher) {
@@ -52,5 +52,5 @@ export function detectInstallKind(probe: InstallProbe): InstallKind {
 		return { kind: "installed" }
 	}
 
-	return { kind: "portable", reason: "no-uninstaller" }
+	return { kind: "unknown", reason: "no-uninstaller" }
 }

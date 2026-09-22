@@ -129,6 +129,8 @@ line. If the tray is unavailable, the window opens so the app remains accessible
 
 A new release announces itself with a button in the window header, next to the VLC and Discord
 chips, and there is nothing there the rest of the time, so an empty header means you are current.
+If the app cannot tell whether this copy came from the installer, it says so in About and uses
+manual updates until the installation can be identified.
 An installed copy reads "Update to 5.0.1", downloads it and restarts to finish. A portable copy
 reads "Get 5.0.1" and opens the release page, because a portable build cannot replace the file it
 is running from. While it downloads, the button becomes the version and the percent. If you would

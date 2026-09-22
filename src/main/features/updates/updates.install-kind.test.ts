@@ -15,9 +15,9 @@ describe("detectInstallKind", () => {
 		})
 	})
 
-	it("falls back to portable when nothing identifies the copy", () => {
+	it("reports uncertainty when nothing identifies the copy", () => {
 		expect(detectInstallKind({ portableLauncher: false, uninstallerPresent: false })).toEqual({
-			kind: "portable",
+			kind: "unknown",
 			reason: "no-uninstaller",
 		})
 	})

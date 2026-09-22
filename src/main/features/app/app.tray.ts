@@ -295,7 +295,7 @@ export class Tray {
 				},
 			]
 
-			if (!this.startup.isPortable()) {
+			if (this.startup.canStartAtLogin()) {
 				menuItems.push({
 					label: "Start with System",
 					type: "checkbox",

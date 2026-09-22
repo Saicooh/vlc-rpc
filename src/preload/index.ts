@@ -49,7 +49,6 @@ const api = {
 		close: typedInvoke("window:close"),
 		isMaximized: typedInvoke("window:is-maximized"),
 		getPlatform: typedInvoke("system:platform"),
-		isPortable: typedInvoke("app:is-portable"),
 		setStartWithSystem: typedInvoke("app:set-start-with-system"),
 		onMaximizedChange: (callback: (isMaximized: boolean) => void) => {
 			return onEvent("window:maximized-change", callback)

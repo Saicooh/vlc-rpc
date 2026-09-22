@@ -10,7 +10,7 @@ const STATES: UpdateAvailability[] = [
 	{ kind: "failed", version: "5.0.0" },
 ]
 
-const KINDS: UpdateInstallKind[] = ["setup", "portable"]
+const KINDS: UpdateInstallKind[] = ["setup", "portable", "unknown"]
 
 describe("describeUpdateOffer", () => {
 	it("offers nothing while there is no release to act on", () => {
@@ -36,6 +36,12 @@ describe("describeUpdateOffer", () => {
 
 		expect(kinds).not.toContain("install")
 		expect(kinds).not.toContain("working")
+	})
+
+	it("explains why an unidentified copy needs a manual update", () => {
+		const offer = describeUpdateOffer("unknown", { kind: "available", version: "5.0.0" })
+		expect(offer.kind).toBe("release-page")
+		expect(offer.kind === "release-page" && offer.detail).toContain("could not tell")
 	})
 
 	it("offers an installed copy the install, and nothing else", () => {

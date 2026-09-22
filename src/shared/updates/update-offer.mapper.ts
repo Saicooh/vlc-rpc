@@ -34,12 +34,15 @@ export function describeUpdateOffer(
 
 	const { version } = availability
 
-	if (install === "portable") {
+	if (install !== "setup") {
 		return {
 			kind: "release-page",
 			version,
 			label: `Get ${version}`,
-			detail: `Opens the release page. This copy is portable, so it cannot replace itself: download ${version} there and swap the file.`,
+			detail:
+				install === "portable"
+					? `Opens the release page. This copy is portable, so it cannot replace itself: download ${version} there and swap the file.`
+					: `Opens the release page. The app could not tell how this copy was installed, so download ${version} manually.`,
 		}
 	}
 
