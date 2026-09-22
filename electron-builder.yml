@@ -25,7 +25,8 @@ win:
       arch:
         - x64
   icon: resources/icon.ico
-  publisherName: "Valentin Marquez"
+  signtoolOptions:
+    publisherName: "Valentin Marquez"
   verifyUpdateCodeSignature: false
   sign: null
 nsis:
