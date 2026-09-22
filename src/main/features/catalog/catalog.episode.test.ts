@@ -50,6 +50,32 @@ describe("EpisodeTitleResolver", () => {
 		)
 	})
 
+	it("tries the base series title when the identified anime title includes a season", async () => {
+		const fetchMock = vi.fn(async (url: string) => {
+			if (url.includes("4th%20Season")) return reply({}, false)
+			if (url.includes("singlesearch")) {
+				return reply({ id: 14459, name: "Re:Zero kara Hajimeru Isekai Seikatsu" })
+			}
+			return reply({ name: "Good Loser" })
+		})
+		vi.stubGlobal("fetch", fetchMock)
+		const catalog: CatalogResult = {
+			title: "Re:Zero kara Hajimeru Isekai Seikatsu 4th Season",
+			poster: null,
+			mediaKind: "tv",
+			sourceUrl: "https://anilist.co/anime/189046",
+		}
+		const filename =
+			"[Erai-raws] Re Zero kara Hajimeru Isekai Seikatsu 4th Season - 17 [1080p CR WEBRip HEVC AAC][MultiSub][A8F9762F].mkv"
+
+		expect(await new EpisodeTitleResolver().resolve(status(filename), catalog)).toBe("Good Loser")
+		expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+			"https://api.tvmaze.com/singlesearch/shows?q=Re%3AZero%20kara%20Hajimeru%20Isekai%20Seikatsu%204th%20Season",
+			"https://api.tvmaze.com/singlesearch/shows?q=Re%20Zero%20kara%20Hajimeru%20Isekai%20Seikatsu",
+			"https://api.tvmaze.com/shows/14459/episodebynumber?season=4&number=17",
+		])
+	})
+
 	it("does not use a fuzzy match for a different show or guess a different season", async () => {
 		const fetchMock = vi.fn(async (url: string) =>
 			url.includes("singlesearch") ? reply({ id: 17, name: "An Unrelated Show" }) : reply([]),

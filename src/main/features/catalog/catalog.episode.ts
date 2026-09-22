@@ -83,16 +83,21 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 		const episode = status.media.episode ?? catalog?.episode ?? parsed.episode
 		if (episode === undefined || episode < 1) return null
 
-		const title =
-			catalog?.title || status.media.showName || parsed.title || status.media.title || ""
+		const titles = [
+			catalog?.title,
+			status.media.showName,
+			parsed.title,
+			...(parsed.title ? [] : [status.media.title]),
+		].filter((title): title is string => Boolean(title?.trim()))
+		const candidates = [...new Set(titles)]
 		const id = anilistId(catalog?.sourceUrl)
-		const key = `${words(title).join("")}|${season ?? "absolute"}|${episode}|${id ?? ""}`
+		const key = `${candidates.map((title) => words(title).join("")).join("|")}|${season ?? "absolute"}|${episode}|${id ?? ""}`
 		const cached = this.cache.get(key)
 		if (cached && Date.now() < cached.expiresAt) return cached.value
 		const pending = this.inflight.get(key)
 		if (pending) return pending
 
-		const lookup = this.lookup(title, season, episode, id)
+		const lookup = this.lookup(candidates, season, episode, id)
 		this.inflight.set(key, lookup)
 		try {
 			const value = await lookup
@@ -111,32 +116,27 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 	}
 
 	private async lookup(
-		title: string,
+		titles: string[],
 		season: number | undefined,
 		episode: number,
 		id: number | null,
 	): Promise<string | null> {
-		try {
-			if (season !== undefined && season >= 1 && title.trim()) {
-				return await this.fromTvMaze(title, season, episode)
+		if (season !== undefined && season < 1) return null
+		if (season === undefined && id !== null) {
+			try {
+				const streamingTitle = await this.fromAniList(id, episode)
+				if (streamingTitle) return streamingTitle
+			} catch (error) {
+				logger.warn(`AniList episode title lookup failed: ${error}`)
 			}
-			if (season === undefined && id !== null) {
-				try {
-					const streamingTitle = await this.fromAniList(id, episode)
-					if (streamingTitle) return streamingTitle
-				} catch (error) {
-					logger.warn(`AniList episode title lookup failed: ${error}`)
-				}
+		}
+		for (const title of titles) {
+			try {
+				const found = await this.fromTvMaze(title, season, episode)
+				if (found) return found
+			} catch (error) {
+				logger.warn(`TVMaze episode title lookup failed: ${error}`)
 			}
-			if (season === undefined && title.trim()) {
-				try {
-					return await this.fromTvMaze(title, undefined, episode)
-				} catch (error) {
-					logger.warn(`TVMaze episode title lookup failed: ${error}`)
-				}
-			}
-		} catch (error) {
-			logger.warn(`Episode title lookup failed: ${error}`)
 		}
 		return null
 	}
