@@ -83,7 +83,8 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 		const episode = status.media.episode ?? catalog?.episode ?? parsed.episode
 		if (episode === undefined || episode < 1) return null
 
-		const title = status.media.showName || parsed.title || catalog?.title || ""
+		const title =
+			catalog?.title || status.media.showName || parsed.title || status.media.title || ""
 		const id = anilistId(catalog?.sourceUrl)
 		const key = `${words(title).join("")}|${season ?? "absolute"}|${episode}|${id ?? ""}`
 		const cached = this.cache.get(key)

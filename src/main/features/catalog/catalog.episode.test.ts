@@ -114,7 +114,7 @@ describe("EpisodeTitleResolver", () => {
 		expect(fetchMock.mock.calls[0]?.[0]).toBe("https://graphql.anilist.co")
 	})
 
-	it("finds episode 12 using the romanized TVMaze alias when AniList has no streaming title", async () => {
+	it("uses the identified anime instead of the short release name for episode 12", async () => {
 		const fetchMock = vi.fn(async (url: string) => {
 			if (url === "https://graphql.anilist.co") {
 				return reply({ data: { Media: { streamingEpisodes: [] } } })
@@ -133,13 +133,12 @@ describe("EpisodeTitleResolver", () => {
 			title: "Watashi wo Tabetai, Hitodenashi",
 			poster: null,
 			mediaKind: "tv",
-			episode: 12,
 			sourceUrl: "https://anilist.co/anime/183385",
 		}
 
 		expect(
 			await new EpisodeTitleResolver().resolve(
-				status("[SubsPlease] Watashi wo Tabetai, Hitodenashi - 12 (1080p).mkv"),
+				status("[Erai-raws] WataTabe - 12 [WEB 1080p].mkv"),
 				catalog,
 			),
 		).toBe("Beloved Child")

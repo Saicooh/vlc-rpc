@@ -257,7 +257,11 @@ bun run test       # vitest, needs no VLC and no network
 bun run typecheck  # main and renderer
 bun run lint       # biome, writes fixes
 bun run build      # typecheck, then bundle
+bun run build:win  # installer and portable executable in dist/
 ```
+
+`bun run build` does not replace an installed copy. Run `bun run dev` to try the source directly,
+or install the new build from `dist/` after `bun run build:win`.
 
 Audio fingerprinting needs two things a clone does not have. `bun install` fetches
 Chromaprint's `fpcalc` for your platform into `resources/bin/`, which is git ignored, and the
