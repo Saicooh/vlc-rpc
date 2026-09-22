@@ -17,6 +17,7 @@ export interface VlcStatus {
 		album?: string
 		nowPlaying?: string
 		artworkUrl?: string | undefined
+		sourceUri?: string | undefined
 	}
 	videoInfo?:
 		| {
@@ -24,6 +25,8 @@ export interface VlcStatus {
 				height: number
 		  }
 		| undefined
+	/** VLC's current Blu-Ray title and chapter, converted from zero-based indices. */
+	disc?: { title: number | null; chapter: number | null }
 }
 
 /**

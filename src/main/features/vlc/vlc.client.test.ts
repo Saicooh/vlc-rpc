@@ -61,6 +61,46 @@ afterEach(() => {
 // language VLC, which is the point: see the mediaType test below.
 
 describe("readStatus", () => {
+	it("reads a Blu-Ray URI once and uses a named folder instead of a disc product code", async () => {
+		const client = new Client()
+		const raw = JSON.parse(fixture("video-movie.status"))
+		raw.information.category.meta.title = "UPXX-1016"
+		raw.information.category.meta.filename = "index.bdmv"
+		raw.information.title = 0
+		raw.information.chapter = 2
+		const statusBody = JSON.stringify(raw)
+		const fetchMock = vi.fn(async (url: string) => ({
+			status: 200,
+			text: async () =>
+				url.endsWith("playlist.json")
+					? JSON.stringify({
+							ro: "ro",
+							type: "node",
+							name: "Playlist",
+							id: "0",
+							children: [
+								{
+									ro: "ro",
+									type: "leaf",
+									name: "Disc",
+									id: "3",
+									current: "current",
+									uri: "bluray:///D:/The.Matrix.1999/BDMV/",
+								},
+							],
+						})
+					: statusBody,
+		}))
+		vi.stubGlobal("fetch", fetchMock)
+
+		const first = await client.readStatus(true)
+		const second = await client.readStatus(true)
+		expect(first?.media.title).toBe("The Matrix 1999")
+		expect(first?.media.sourceUri).toBe("bluray:///D:/The.Matrix.1999/BDMV/")
+		expect(first?.disc).toEqual({ title: 1, chapter: 3 })
+		expect(second?.media.title).toBe("The Matrix 1999")
+		expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("playlist.json"))).toHaveLength(1)
+	})
 	it("maps an untagged mp3 using the filename, without its extension", async () => {
 		respondWith(fixture("audio-untagged.status"))
 		const status = await vlcStatusService.readStatus(true)

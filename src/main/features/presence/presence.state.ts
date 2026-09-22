@@ -12,6 +12,7 @@ import type { AppConfig } from "@shared/config/app-config"
 import type { ResolvedLayout, VideoFacts } from "@shared/presence/layout"
 import { renderLine, resolveLayout, videoVariables } from "@shared/presence/layout"
 import type { DiscordPresenceData } from "@shared/presence/presence.types"
+import { bluRayFolderTitle, isBluRaySource } from "@shared/vlc/bluray"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 
 import type { CoverOutcome, VideoCoverResult } from "@main/features/cover"
@@ -86,6 +87,7 @@ function videoFacts(
 	catalogResult: CatalogResult | null,
 	localParse: ParsedVideo | null,
 	canonicalTitle: string | null,
+	disc: VlcStatus["disc"],
 ): VideoFacts {
 	const isTvShow = catalogResult
 		? catalogResult.mediaKind === "tv"
@@ -106,6 +108,8 @@ function videoFacts(
 		season: isTvShow ? (catalogResult?.season ?? localParse?.season) : undefined,
 		episode: isTvShow ? (catalogResult?.episode ?? localParse?.episode) : undefined,
 		year: localParse?.year,
+		discTitle: disc?.title,
+		chapter: disc?.chapter,
 	}
 }
 
@@ -132,7 +136,7 @@ function buildLines(
 
 	if (mediaInfo.mediaType === "video") {
 		const variables = videoVariables(
-			videoFacts(media.title ?? "", catalogResult, localParse, canonicalTitle),
+			videoFacts(media.title ?? "", catalogResult, localParse, canonicalTitle, mediaInfo.disc),
 		)
 		return {
 			details: renderLine(layout.video.details, variables),
@@ -274,7 +278,10 @@ class PlayingState extends MediaState {
 		// concrete file being played, and parsing is pure and local.
 		const videoName = media.filename || media.title || ""
 		const localParse =
-			mediaType === "video" ? parseVideo(videoName, mediaInfo.playback.duration) : null
+			mediaType === "video" &&
+			(!isBluRaySource(media.sourceUri) || bluRayFolderTitle(media.sourceUri))
+				? parseVideo(videoName, mediaInfo.playback.duration)
+				: null
 		const videoCover =
 			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
 		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
@@ -395,7 +402,10 @@ class PausedState extends MediaState {
 		// concrete file being played, and parsing is pure and local.
 		const videoName = media.filename || media.title || ""
 		const localParse =
-			mediaType === "video" ? parseVideo(videoName, mediaInfo.playback.duration) : null
+			mediaType === "video" &&
+			(!isBluRaySource(media.sourceUri) || bluRayFolderTitle(media.sourceUri))
+				? parseVideo(videoName, mediaInfo.playback.duration)
+				: null
 		const videoCover =
 			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
 		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null

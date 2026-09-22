@@ -60,6 +60,12 @@ export const SAMPLE_EPISODE: VideoFacts = {
 	year: 2009,
 }
 export const SAMPLE_FILM: VideoFacts = { title: "The Matrix", year: 1999 }
+export const SAMPLE_BLURAY: VideoFacts = {
+	title: "The Matrix",
+	year: 1999,
+	discTitle: 1,
+	chapter: 3,
+}
 
 /**
  * Four slots, because Discord draws four pieces of text for music and the first of them is

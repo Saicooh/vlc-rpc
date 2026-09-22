@@ -103,6 +103,18 @@ function videoOverride(fields: Partial<Pick<VideoOverride, "title" | "cover" | "
 	return override
 }
 
+describe("Blu-Ray disc identity", () => {
+	it("does not query providers for an opaque volume label", async () => {
+		const { cache } = fakeCache()
+		const provider = fakeProvider([])
+		const resolver = new Resolver(cache, provider.provider, noOverrides())
+		const disc = status("UPXX-1016")
+		disc.media.sourceUri = "bluray:///D:/"
+		expect(await resolver.resolve(disc)).toBeNull()
+		expect(provider.calls.search).toBe(0)
+	})
+})
+
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
 	return {
 		provider: "anilist",

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { configService } from "@main/core/config"
 import { logger } from "@main/core/logger"
+import { bluRayFolderTitle, isBluRaySource } from "@shared/vlc/bluray"
 import type { VlcConnectionReason, VlcConnectionStatus, VlcStatus } from "@shared/vlc/vlc.types"
 import { detectVideoStream } from "./vlc.mapper"
 import type { VlcMetadata, VlcPlaylistItem, VlcPlaylistResponse, VlcRawStatus } from "./vlc.types"
@@ -42,6 +43,8 @@ export class Client {
 	private lastStatus: VlcStatus | null = null
 	private baseUrl = ""
 	private authHeader: Record<string, string> = {}
+	private lastVideoUriKey: string | null = null
+	private lastVideoUri: string | null = null
 
 	constructor() {
 		this.updateConnectionInfo()
@@ -133,6 +136,7 @@ export class Client {
 			const vlcStatus: VlcRawStatus = JSON.parse(content)
 
 			const status = this.convertVlcStatus(vlcStatus)
+			await this.attachVideoUri(status, vlcStatus.information)
 			this.lastStatus = status
 			return status
 		} catch (error: unknown) {
@@ -181,6 +185,7 @@ export class Client {
 				const vlcStatus: VlcRawStatus = JSON.parse(content)
 
 				const status = this.convertVlcStatus(vlcStatus)
+				await this.attachVideoUri(status, vlcStatus.information)
 				this.lastStatus = status
 				this.lastStatusHash = createHash("md5").update(content).digest("hex")
 
@@ -300,6 +305,42 @@ export class Client {
 		}
 
 		return status
+	}
+
+	private async attachVideoUri(
+		status: VlcStatus,
+		information?: VlcRawStatus["information"],
+	): Promise<void> {
+		if (
+			status.mediaType !== "video" &&
+			!/\.bdmv$/i.test(status.media.filename ?? "") &&
+			!/^[a-z]{2,8}[-_ ]?\d{3,}$/i.test(status.media.title ?? "")
+		)
+			return
+		const key = `${status.plid ?? "none"}|${status.media.filename ?? status.media.title ?? ""}`
+		if (key !== this.lastVideoUriKey) {
+			this.lastVideoUri = await this.getCurrentFileUri()
+			this.lastVideoUriKey = key
+		}
+		status.media.sourceUri = this.lastVideoUri ?? undefined
+		if (isBluRaySource(this.lastVideoUri ?? undefined)) {
+			status.mediaType = "video"
+			status.disc = {
+				title:
+					typeof information?.title === "number" && information.title >= 0
+						? information.title + 1
+						: null,
+				chapter:
+					typeof information?.chapter === "number" && information.chapter >= 0
+						? information.chapter + 1
+						: null,
+			}
+			const title = bluRayFolderTitle(this.lastVideoUri ?? undefined)
+			if (title) {
+				status.media.title = title
+				status.media.filename = title
+			}
+		}
 	}
 
 	/** The URI of the item the playlist marks as current, which status.json does not carry. */

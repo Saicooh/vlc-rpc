@@ -31,6 +31,8 @@ const NOTHING_PLAYING = {
 	artwork: null,
 	fileTitle: null,
 	mediaType: null,
+	discTitle: null,
+	chapter: null,
 } as const
 
 /**
@@ -57,6 +59,8 @@ export function mergeVlcStatus(previous: MediaState, status: VlcStatus | null): 
 		duration: playback.duration || null,
 		position: playback.time || null,
 		mediaType: status.mediaType || null,
+		discTitle: status.disc?.title ?? null,
+		chapter: status.disc?.chapter ?? null,
 		fileTitle,
 		nowPlaying: media.nowPlaying || null,
 	}

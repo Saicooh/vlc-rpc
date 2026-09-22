@@ -2,6 +2,7 @@ import { logger } from "@main/core/logger"
 import type { AniListProvider } from "@main/features/catalog"
 import { parse } from "@main/features/catalog/catalog.parser"
 import type { Candidate, CatalogResult, ParsedVideo } from "@main/features/catalog/catalog.types"
+import { bluRayFolderTitle, isBluRaySource } from "@shared/vlc/bluray"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 
 export interface VideoCoverResult {
@@ -79,6 +80,8 @@ export class VideoResolver {
 		catalogResult: CatalogResult | null = null,
 	): Promise<VideoCoverResult> {
 		if (status.mediaType !== "video") return emptyResult()
+		if (isBluRaySource(status.media.sourceUri) && !bluRayFolderTitle(status.media.sourceUri))
+			return emptyResult()
 
 		const sourceName = status.media.filename || status.media.title || ""
 		const parsed = parse(sourceName, status.playback.duration)

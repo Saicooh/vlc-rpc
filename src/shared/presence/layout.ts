@@ -225,6 +225,8 @@ export interface VideoFacts {
 	season?: number | undefined
 	episode?: number | undefined
 	year?: string | number | undefined
+	discTitle?: number | null | undefined
+	chapter?: number | null | undefined
 }
 
 /**
@@ -242,6 +244,8 @@ export function videoVariables(facts: VideoFacts): TemplateVariables {
 		season: facts.season,
 		episode: facts.episode,
 		year: episodeInfo === "" ? facts.year : undefined,
+		discTitle: facts.discTitle ?? undefined,
+		chapter: facts.chapter ?? undefined,
 	}
 }
 
@@ -346,6 +350,8 @@ export const VIDEO_PIECES: readonly PieceInfo[] = [
 	{ name: "year", label: "Year", noun: "release year" },
 	{ name: "season", label: "Season number", noun: "season number" },
 	{ name: "episode", label: "Episode number", noun: "episode number" },
+	{ name: "discTitle", label: "Blu-Ray title number", noun: "Blu-Ray title number" },
+	{ name: "chapter", label: "Blu-Ray chapter", noun: "Blu-Ray chapter" },
 ]
 
 export function pieceLabel(piece: LayoutPiece, pieces: readonly PieceInfo[]): string {

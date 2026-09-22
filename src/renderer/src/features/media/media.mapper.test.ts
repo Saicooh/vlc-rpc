@@ -15,6 +15,8 @@ const EMPTY: MediaState = {
 	artwork: null,
 	fileTitle: null,
 	mediaType: null,
+	discTitle: null,
+	chapter: null,
 	contentType: null,
 	contentImageUrl: null,
 	contentImageSourceUrl: null,
@@ -54,6 +56,13 @@ function resolved(): MediaState {
 }
 
 describe("mergeVlcStatus", () => {
+	it("updates the current Blu-Ray chapter while the disc keeps playing", () => {
+		const disc = playing({ title: "The Matrix" })
+		const first = mergeVlcStatus(EMPTY, { ...disc, disc: { title: 1, chapter: 1 } })
+		const next = mergeVlcStatus(first, { ...disc, disc: { title: 1, chapter: 2 } })
+		expect(next.discTitle).toBe(1)
+		expect(next.chapter).toBe(2)
+	})
 	it("updates the current radio track without changing the station title", () => {
 		const station = playing({ title: "Groove Salad", nowPlaying: "First track" })
 		const first = mergeVlcStatus(EMPTY, station)

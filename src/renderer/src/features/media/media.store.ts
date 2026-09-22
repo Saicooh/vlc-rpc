@@ -19,6 +19,8 @@ export interface MediaState {
 	 */
 	fileTitle: string | null
 	mediaType: "video" | "audio" | null
+	discTitle: number | null
+	chapter: number | null
 	// Enriched info (from media detection)
 	contentType: ContentType | null
 	contentImageUrl: string | null
@@ -61,6 +63,8 @@ const INITIAL_STATE: MediaState = {
 	artwork: null,
 	fileTitle: null,
 	mediaType: null,
+	discTitle: null,
+	chapter: null,
 	contentType: null,
 	contentImageUrl: null,
 	contentImageSourceUrl: null,

@@ -63,7 +63,7 @@ cover than the wrong one, so a weak match is discarded.
 
 | Content | Source | Needs an account |
 | --- | --- | --- |
-| Audio with cover art in the file | The file itself | No |
+| Audio or video with local cover art | The file itself, uploaded for Discord | No |
 | Audio with usable tags | iTunes Search, then MusicBrainz and the Cover Art Archive | No |
 | Audio with no usable tags | The sound itself, see below | No |
 | Anime | AniList | No |
@@ -183,7 +183,13 @@ western series without credentials. Films and series that TVMaze cannot identify
 Google Images lookup, with an IMDb search link when an image is found. A correction is still the
 reliable answer when a title has an unusual name or the public sources disagree.
 
-**Embedded cover art is uploaded to a public file host.** To show the artwork inside your audio
+**Blu-Ray discs:** The app reads the playing URI from VLC's playlist. For a named rip folder it
+uses the folder title; it also makes VLC's title and chapter numbers available as video layout
+pieces. A drive root or product code does not identify the film reliably, so the app leaves that
+label alone and lets you save a correction with the film title and poster. Playback times still
+come from VLC.
+
+**Embedded cover art is uploaded to a public file host.** To show the artwork inside your media
 files, the app uploads that image to five temporary hosts at once (x0.at, catbox.moe, uguu.se,
 0x0.st, tempfile.org) and gives Discord the first link that comes back. The uploads still in flight
 are cancelled the moment one host answers, but a host that finished first has a copy of its own.

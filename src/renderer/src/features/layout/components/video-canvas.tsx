@@ -17,7 +17,7 @@ import {
 import { inspectLayout } from "@shared/presence/layout-builder"
 
 import type { PreviewSample } from "../layout.constants"
-import { SAMPLE_EPISODE, SAMPLE_FILM, VIDEO_SLOTS } from "../layout.constants"
+import { SAMPLE_BLURAY, SAMPLE_EPISODE, SAMPLE_FILM, VIDEO_SLOTS } from "../layout.constants"
 import { useLayoutDraft } from "../use-layout-draft"
 import { LayoutCanvas } from "./layout-canvas"
 
@@ -39,6 +39,13 @@ const FIXTURES: readonly PreviewSample[] = [
 		inSentence: "a film",
 		isLive: false,
 		variables: videoVariables(SAMPLE_FILM),
+	},
+	{
+		id: "bluray",
+		label: "A Blu-Ray disc",
+		inSentence: "a Blu-Ray disc",
+		isLive: false,
+		variables: videoVariables(SAMPLE_BLURAY),
 	},
 ]
 
@@ -106,5 +113,7 @@ function liveFacts(media: MediaState): VideoFacts | null {
 		season: media.season ?? undefined,
 		episode: media.episode ?? undefined,
 		year: media.year ?? undefined,
+		discTitle: media.discTitle,
+		chapter: media.chapter,
 	}
 }

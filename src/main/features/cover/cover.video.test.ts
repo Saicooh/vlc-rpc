@@ -38,6 +38,17 @@ function anilistResult(overrides: Partial<Candidate> = {}): Candidate {
 }
 
 describe("VideoResolver", () => {
+	it("does not search an opaque Blu-Ray volume code", async () => {
+		const searchBest = vi.fn(async () => anilistResult())
+		const fetch = vi.fn()
+		vi.stubGlobal("fetch", fetch)
+		const disc = status("UPXX-1016")
+		disc.media.sourceUri = "bluray:///D:/"
+		const result = await new VideoResolver({ searchBest }).resolve(disc)
+		expect(result.imageUrl).toBeNull()
+		expect(searchBest).not.toHaveBeenCalled()
+		expect(fetch).not.toHaveBeenCalled()
+	})
 	it("uses a catalog poster and preserves its source", async () => {
 		const catalog: CatalogResult = {
 			title: "The Matrix",

@@ -1,5 +1,6 @@
 import { logger } from "@main/core/logger"
 import type { Override, OverrideTarget, VideoOverride } from "@main/features/overrides"
+import { bluRayFolderTitle, isBluRaySource } from "@shared/vlc/bluray"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 import type { Cache } from "./catalog.cache"
 import { catalogKey } from "./catalog.key"
@@ -65,6 +66,12 @@ export class Resolver {
 		if (override?.kind === "video") {
 			const work = applyOverride(override, parsed)
 			return { ...work, season: parsed.season, episode: parsed.episode }
+		}
+
+		// A disc root only gives us a volume/product code. Searching that as a
+		// film title produced unrelated matches; a manual correction still wins above.
+		if (isBluRaySource(status.media.sourceUri) && !bluRayFolderTitle(status.media.sourceUri)) {
+			return null
 		}
 
 		const cached = this.cache.get(key)
