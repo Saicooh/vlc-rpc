@@ -146,6 +146,7 @@ function buildVideo(
 	result: CatalogResult | null,
 	target: OverrideTarget | null = null,
 	proxied: string | null = null,
+	localCover?: CoverOutcome,
 ): MediaInfoHandler {
 	const refuse = (): never => {
 		throw new Error("the audio path must not be consulted for video")
@@ -168,10 +169,38 @@ function buildVideo(
 	const vlc = { readStatus: async () => null } as unknown as VlcClient
 	const imageProxy = { getImageAsDataUrl: async () => proxied } as unknown as ImageProxy
 
-	return new MediaInfoHandler(artwork, catalog, music, vlc, imageProxy)
+	return new MediaInfoHandler(
+		artwork,
+		catalog,
+		music,
+		vlc,
+		imageProxy,
+		localCover ? { fetch: async () => localCover } : undefined,
+	)
 }
 
 describe("MediaInfoHandler video content fields", () => {
+	it("reports the published file cover ahead of the catalog cover", async () => {
+		const handler = buildVideo(
+			{ title: "Akira", poster: CATALOG_POSTER, mediaKind: "movie" },
+			null,
+			null,
+			{ kind: "published", url: PUBLISHED_COVER },
+		)
+		const info = await handler.getMediaInfo(videoStatus("Akira.1988.mkv"))
+		expect(info?.content_image_url).toBe(PUBLISHED_COVER)
+	})
+
+	it("does not replace VLC's cached local artwork URL while proxying the screen image", async () => {
+		const handler = buildVideo(null, null, "data:image/jpeg;base64,aGVsbG8=", {
+			kind: "published",
+			url: PUBLISHED_COVER,
+		})
+		const original = videoStatus("film.mkv")
+		original.media.artworkUrl = LOCAL_ARTWORK
+		await handler.getMediaInfo(original)
+		expect(original.media.artworkUrl).toBe(LOCAL_ARTWORK)
+	})
 	it("reports the canonical title, the tv kind, and the episode it is playing", async () => {
 		const handler = buildVideo({
 			title: "Sora wa Akai Kawa no Hotori",

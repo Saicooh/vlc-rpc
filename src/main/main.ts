@@ -129,6 +129,7 @@ if (!gotTheLock) {
 			musicResolver,
 			videoCover,
 			new Presence.SyncplayDetector(),
+			cover,
 		)
 
 		// The tray/window cycle, resolved in fixed order
@@ -139,7 +140,7 @@ if (!gotTheLock) {
 		// Handlers, one per feature
 		new App.AppInfoHandler(startup)
 		new Cover.MetadataHandler(coverStore)
-		new Media.MediaInfoHandler(artwork, catalogResolver, musicResolver, vlc, imageProxy)
+		new Media.MediaInfoHandler(artwork, catalogResolver, musicResolver, vlc, imageProxy, cover)
 		const discordRpcHandler = new Discord.DiscordRpcHandler(discord, vlc, presence, systemClock)
 		// Both resolvers, because the key alone does not say which cache holds what
 		// the correction replaces. The rpc handler, because evicting a cache does

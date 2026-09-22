@@ -2,6 +2,7 @@ import { registerHandler } from "@main/core/ipc"
 import { logger } from "@main/core/logger"
 import type { Resolver as ArtworkResolver } from "@main/features/artwork"
 import type { Resolver as CatalogResolver, CatalogResult } from "@main/features/catalog"
+import type { CoverOutcome } from "@main/features/cover"
 import type { CorrectedTags, OverrideTarget } from "@main/features/overrides"
 import type { Client as VlcClient } from "@main/features/vlc"
 import type { ContentMetadata, ContentType, DetectedMediaInfo } from "@shared/media/media.types"
@@ -88,6 +89,7 @@ export class MediaInfoHandler {
 		private readonly music: OverrideTargets,
 		private readonly vlc: VlcClient,
 		private readonly imageProxy: ImageProxy,
+		private readonly localVideoArtwork?: { fetch(status: VlcStatus): Promise<CoverOutcome> },
 	) {
 		this.registerHandlers()
 	}
@@ -121,7 +123,10 @@ export class MediaInfoHandler {
 		}
 
 		try {
-			const mediaInfo: VlcStatus & DetectedMediaInfo = { ...vlcStatus }
+			const mediaInfo: VlcStatus & DetectedMediaInfo = {
+				...vlcStatus,
+				media: { ...vlcStatus.media },
+			}
 
 			if (vlcStatus.mediaType === "audio") {
 				const cover = await this.artwork.resolve(vlcStatus)
@@ -148,11 +153,12 @@ export class MediaInfoHandler {
 			}
 
 			if (vlcStatus.mediaType === "video") {
+				const localCover = await this.localVideoArtwork?.fetch(vlcStatus)
 				const catalogResult = await this.catalog.resolve(vlcStatus)
 				if (catalogResult) {
 					// A work can be identified without art, so the title and the kind
 					// are reported whether or not a poster came with them.
-					if (catalogResult.poster) {
+					if (catalogResult.poster && localCover?.kind !== "publish-failed") {
 						mediaInfo.content_image_url = catalogResult.poster
 					}
 					mediaInfo.content_type = toContentType(catalogResult.mediaKind)
@@ -163,6 +169,10 @@ export class MediaInfoHandler {
 				// as nothing is the case a correction is for, and since TMDB was
 				// removed that is all of western film and television.
 				reportOverrideTarget(mediaInfo, this.catalog.overrideTargetFor(vlcStatus))
+
+				if (localCover?.kind === "published") {
+					mediaInfo.content_image_url = localCover.url
+				}
 			}
 
 			if (mediaInfo.media?.artworkUrl) {

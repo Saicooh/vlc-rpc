@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest"
 import { coverKey } from "./cover.key"
 
 describe("coverKey", () => {
+	it("keys video artwork per file and changes when VLC discovers a cover", () => {
+		const first = coverKey({ mediaType: "video", media: { filename: "episode-1.mkv" } })
+		const next = coverKey({ mediaType: "video", media: { filename: "episode-2.mkv" } })
+		const covered = coverKey({
+			mediaType: "video",
+			media: { filename: "episode-1.mkv", artworkUrl: "file:///poster.jpg" },
+		})
+		expect(first).not.toBe(next)
+		expect(first).not.toBe(covered)
+	})
 	it("keys audio by artist and album, not by title", () => {
 		const trackThree = coverKey({
 			media: { artist: "Christian Nodal", album: "Ahora", title: "Probablemente" },

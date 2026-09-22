@@ -135,6 +135,17 @@ describe("Resolver outcomes", () => {
 		expect(outcome).toEqual({ kind: "published", url: "https://0x0.st/cover.jpg" })
 	})
 
+	it("publishes local artwork from a video without sharing audio's album cache", async () => {
+		const uploader = fakeUploader(async () => "https://0x0.st/video-cover.jpg")
+		const resolver = new Resolver(fakeVlc(), fakeStore(), uploader)
+		const video = { ...status({ filename: "film.mkv", artworkUrl }), mediaType: "video" as const }
+
+		expect(await resolver.fetch(video)).toEqual({
+			kind: "published",
+			url: "https://0x0.st/video-cover.jpg",
+		})
+	})
+
 	it("reports no artwork when the file has none embedded", async () => {
 		const resolver = new Resolver(fakeVlc(), fakeStore(), fakeUploader())
 

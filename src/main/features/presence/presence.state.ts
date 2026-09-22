@@ -14,7 +14,7 @@ import { renderLine, resolveLayout, videoVariables } from "@shared/presence/layo
 import type { DiscordPresenceData } from "@shared/presence/presence.types"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 
-import type { VideoCoverResult } from "@main/features/cover"
+import type { CoverOutcome, VideoCoverResult } from "@main/features/cover"
 import { ActivityType } from "discord-api-types/v10"
 import type { SyncplayStatus } from "./presence.syncplay"
 import type { TimelineWindow } from "./presence.timeline"
@@ -24,6 +24,14 @@ const SYNCPLAY_IMAGE =
 
 interface VideoArtwork {
 	resolve(status: VlcStatus, catalogResult: CatalogResult | null): Promise<VideoCoverResult>
+}
+
+interface LocalVideoArtwork {
+	fetch(status: VlcStatus): Promise<CoverOutcome>
+}
+
+const NO_LOCAL_VIDEO_ARTWORK: LocalVideoArtwork = {
+	fetch: async () => ({ kind: "no-artwork" }),
 }
 
 const NO_VIDEO_ARTWORK: VideoArtwork = {
@@ -236,6 +244,7 @@ class PlayingState extends MediaState {
 		private readonly corrections: AudioCorrections,
 		private readonly videoArtwork: VideoArtwork,
 		private readonly syncplay: SyncplayStatus,
+		private readonly localVideoArtwork: LocalVideoArtwork,
 	) {
 		super()
 	}
@@ -268,6 +277,7 @@ class PlayingState extends MediaState {
 			mediaType === "video" ? parseVideo(videoName, mediaInfo.playback.duration) : null
 		const videoCover =
 			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
+		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
 
 		// The artwork first, and the text after it. Both can come from the same
 		// acoustic match, and the lookup that learns it happens inside this call:
@@ -304,8 +314,9 @@ class PlayingState extends MediaState {
 		const largeImage = largeImageFor(
 			config.largeImage,
 			cover,
-			videoCover?.imageUrl,
-			catalogResult?.poster,
+			localCover?.kind === "published" ? localCover.url : null,
+			localCover?.kind === "publish-failed" ? null : videoCover?.imageUrl,
+			localCover?.kind === "publish-failed" ? null : catalogResult?.poster,
 			media.artworkUrl,
 		)
 		const isSyncplay = await this.syncplay.isRunning()
@@ -354,6 +365,7 @@ class PausedState extends MediaState {
 		private readonly corrections: AudioCorrections,
 		private readonly videoArtwork: VideoArtwork,
 		private readonly syncplay: SyncplayStatus,
+		private readonly localVideoArtwork: LocalVideoArtwork,
 	) {
 		super()
 	}
@@ -386,6 +398,7 @@ class PausedState extends MediaState {
 			mediaType === "video" ? parseVideo(videoName, mediaInfo.playback.duration) : null
 		const videoCover =
 			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
+		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
 
 		// The artwork first, and the text after it. Both can come from the same
 		// acoustic match, and the lookup that learns it happens inside this call:
@@ -418,8 +431,9 @@ class PausedState extends MediaState {
 		const largeImage = largeImageFor(
 			config.largeImage,
 			cover,
-			videoCover?.imageUrl,
-			catalogResult?.poster,
+			localCover?.kind === "published" ? localCover.url : null,
+			localCover?.kind === "publish-failed" ? null : videoCover?.imageUrl,
+			localCover?.kind === "publish-failed" ? null : catalogResult?.poster,
 			media.artworkUrl,
 		)
 		const isSyncplay = await this.syncplay.isRunning()
@@ -475,12 +489,27 @@ export class Service {
 		corrections: AudioCorrections,
 		videoArtwork: VideoArtwork = NO_VIDEO_ARTWORK,
 		syncplay: SyncplayStatus = NO_SYNCPLAY,
+		localVideoArtwork: LocalVideoArtwork = NO_LOCAL_VIDEO_ARTWORK,
 	) {
 		this.states = {
 			stopped: new StoppedState(),
 			noStatus: new NoStatusState(),
-			playing: new PlayingState(artwork, catalog, corrections, videoArtwork, syncplay),
-			paused: new PausedState(artwork, catalog, corrections, videoArtwork, syncplay),
+			playing: new PlayingState(
+				artwork,
+				catalog,
+				corrections,
+				videoArtwork,
+				syncplay,
+				localVideoArtwork,
+			),
+			paused: new PausedState(
+				artwork,
+				catalog,
+				corrections,
+				videoArtwork,
+				syncplay,
+				localVideoArtwork,
+			),
 		}
 
 		logger.info("Media state service initialized")

@@ -7,7 +7,7 @@ import type { Store as CoverStore } from "./cover.store"
 import type { CoverOutcome } from "./cover.types"
 import type { Uploader as CoverUploader } from "./cover.uploader"
 
-/** Service to fetch album cover art for audio files */
+/** Service to publish artwork VLC found inside a local media file. */
 export class Resolver {
 	private lastKey: string | null = null
 	private lastOutcome: CoverOutcome | null = null
@@ -31,7 +31,7 @@ export class Resolver {
 			return { kind: "no-artwork" }
 		}
 
-		const key = coverKey({ media })
+		const key = coverKey({ media, mediaType: mediaInfo.mediaType })
 		if (key === this.lastKey && this.lastOutcome) {
 			return this.lastOutcome
 		}

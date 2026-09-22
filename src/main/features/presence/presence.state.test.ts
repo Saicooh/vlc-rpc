@@ -326,6 +326,7 @@ function videoService(
 		resolve: (status: VlcStatus, result: CatalogResult | null) => Promise<VideoCoverResult>
 	},
 	syncplay?: { isRunning: () => Promise<boolean> },
+	localVideoArtwork?: { fetch: (status: VlcStatus) => Promise<CoverOutcome> },
 ): Service {
 	const artwork = new ArtworkResolver(
 		{
@@ -352,12 +353,33 @@ function videoService(
 		},
 		videoArtwork,
 		syncplay,
+		localVideoArtwork,
 	)
 }
 
 describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 	"Presence video layout while $state",
 	({ state }) => {
+		it("prefers a published local video cover over a catalog poster", async () => {
+			const service = videoService(
+				FILM,
+				{
+					resolve: async () => ({
+						imageUrl: CATALOG_COVER,
+						sourceUrl: null,
+						sourceName: null,
+						canonicalTitle: null,
+					}),
+				},
+				undefined,
+				{ fetch: async () => ({ kind: "published", url: PUBLISHED_COVER }) },
+			)
+			const presence = await service.getDiscordPresence(
+				videoStatus("The Matrix (1999).mkv", state, LOCAL_ARTWORK),
+				timeline,
+			)
+			expect(presence?.large_image).toBe(PUBLISHED_COVER)
+		})
 		it("shows the title with the episode below it by default", async () => {
 			const presence = await videoService(SERIES).getDiscordPresence(
 				videoStatus("Breaking.Bad.S02E05.mkv", state),

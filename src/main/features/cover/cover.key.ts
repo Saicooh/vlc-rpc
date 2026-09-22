@@ -2,6 +2,7 @@ import type { VlcStatus } from "@shared/vlc/vlc.types"
 
 export interface CoverKeyInput {
 	media: VlcStatus["media"]
+	mediaType?: VlcStatus["mediaType"]
 }
 
 /**
@@ -10,6 +11,9 @@ export interface CoverKeyInput {
  * does not change this.
  */
 export function coverKey(input: CoverKeyInput): string {
+	if (input.mediaType === "video") {
+		return `video:${input.media.filename || input.media.title || "unknown"}|${input.media.artworkUrl || ""}`
+	}
 	const artist = input.media.artist || "unknown"
 	if (input.media.album) {
 		return `audio:${artist}|${input.media.album}`
