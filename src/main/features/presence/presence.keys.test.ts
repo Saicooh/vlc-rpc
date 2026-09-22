@@ -60,6 +60,24 @@ describe("presenceKey", () => {
 		expect(a).not.toBe(b)
 	})
 
+	it("changes when a live radio station reports a new track", () => {
+		const first = status({ media: { title: "Groove Salad", nowPlaying: "First song" } })
+		const next = status({ media: { title: "Groove Salad", nowPlaying: "Next song" } })
+		expect(presenceKey(first, 0)).not.toBe(presenceKey(next, 0))
+	})
+
+	it("changes when VLC discovers artwork after the file starts", () => {
+		const first = status({ media: { title: "film.mkv" } })
+		const covered = status({ media: { title: "film.mkv", artworkUrl: "file:///poster.jpg" } })
+		expect(presenceKey(first, 0)).not.toBe(presenceKey(covered, 0))
+	})
+
+	it("changes when a Blu-Ray advances to the next chapter", () => {
+		const first = status({ disc: { title: 1, chapter: 1 } })
+		const next = status({ disc: { title: 1, chapter: 2 } })
+		expect(presenceKey(first, 0)).not.toBe(presenceKey(next, 0))
+	})
+
 	it("changes when the epoch changes, even with identical status", () => {
 		expect(presenceKey(status(), 0)).not.toBe(presenceKey(status(), 1))
 	})

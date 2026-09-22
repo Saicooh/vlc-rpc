@@ -19,6 +19,11 @@ export function presenceKey(status: VlcStatus, epoch: number): string {
 		media.title ?? "",
 		media.artist ?? "",
 		media.album ?? "",
+		media.nowPlaying ?? "",
+		media.artworkUrl ?? "",
+		media.sourceUri ?? "",
+		status.disc?.title ?? "",
+		status.disc?.chapter ?? "",
 		playback.rate,
 		epoch,
 	].join("|")
