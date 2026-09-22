@@ -16,6 +16,14 @@ interface TvMazeShow {
 	name?: string
 }
 
+interface TvMazeAlias {
+	name?: string
+}
+
+interface TvMazeSeason {
+	number?: number
+}
+
 interface EpisodeReply {
 	name?: string | null
 }
@@ -112,7 +120,19 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 				return await this.fromTvMaze(title, season, episode)
 			}
 			if (season === undefined && id !== null) {
-				return await this.fromAniList(id, episode)
+				try {
+					const streamingTitle = await this.fromAniList(id, episode)
+					if (streamingTitle) return streamingTitle
+				} catch (error) {
+					logger.warn(`AniList episode title lookup failed: ${error}`)
+				}
+			}
+			if (season === undefined && title.trim()) {
+				try {
+					return await this.fromTvMaze(title, undefined, episode)
+				} catch (error) {
+					logger.warn(`TVMaze episode title lookup failed: ${error}`)
+				}
 			}
 		} catch (error) {
 			logger.warn(`Episode title lookup failed: ${error}`)
@@ -120,13 +140,38 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 		return null
 	}
 
-	private async fromTvMaze(title: string, season: number, episode: number): Promise<string | null> {
+	private async fromTvMaze(
+		title: string,
+		season: number | undefined,
+		episode: number,
+	): Promise<string | null> {
 		const showResponse = await this.get(`${TVMAZE_SEARCH}${encodeURIComponent(title)}`)
 		if (!showResponse?.ok) return null
 		const show = (await showResponse.json()) as TvMazeShow
-		if (!show.id || !show.name || !sameShow(title, show.name)) return null
+		if (!show.id || !show.name) return null
+		if (!sameShow(title, show.name)) {
+			const aliasesResponse = await this.get(`https://api.tvmaze.com/shows/${show.id}/akas`)
+			if (!aliasesResponse?.ok) return null
+			const aliases = (await aliasesResponse.json()) as TvMazeAlias[]
+			if (
+				!Array.isArray(aliases) ||
+				!aliases.some((alias) => alias.name && sameShow(title, alias.name))
+			) {
+				return null
+			}
+		}
 
-		const url = `https://api.tvmaze.com/shows/${show.id}/episodebynumber?season=${season}&number=${episode}`
+		if (season === undefined) {
+			const seasonsResponse = await this.get(`https://api.tvmaze.com/shows/${show.id}/seasons`)
+			if (!seasonsResponse?.ok) return null
+			const seasons = (await seasonsResponse.json()) as TvMazeSeason[]
+			const regularSeasons = Array.isArray(seasons)
+				? seasons.filter((item) => item.number !== 0)
+				: []
+			if (regularSeasons.length !== 1 || regularSeasons[0]?.number !== 1) return null
+		}
+
+		const url = `https://api.tvmaze.com/shows/${show.id}/episodebynumber?season=${season ?? 1}&number=${episode}`
 		const episodeResponse = await this.get(url)
 		if (!episodeResponse?.ok) return null
 		const found = (await episodeResponse.json()) as EpisodeReply

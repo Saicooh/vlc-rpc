@@ -52,15 +52,13 @@ describe("EpisodeTitleResolver", () => {
 
 	it("does not use a fuzzy match for a different show or guess a different season", async () => {
 		const fetchMock = vi.fn(async (url: string) =>
-			url.includes("singlesearch")
-				? reply({ id: 17, name: "An Unrelated Show" })
-				: reply({ name: "Wrong Episode" }),
+			url.includes("singlesearch") ? reply({ id: 17, name: "An Unrelated Show" }) : reply([]),
 		)
 		vi.stubGlobal("fetch", fetchMock)
 		const resolver = new EpisodeTitleResolver()
 
 		expect(await resolver.resolve(status("Re.ZERO.S05E17.mkv"), null)).toBeNull()
-		expect(fetchMock).toHaveBeenCalledTimes(1)
+		expect(fetchMock).toHaveBeenCalledTimes(2)
 	})
 
 	it("keeps the number when TVMaze has no name for that season and episode", async () => {
@@ -114,6 +112,57 @@ describe("EpisodeTitleResolver", () => {
 		).toBe("Good Loser")
 		expect(fetchMock).toHaveBeenCalledTimes(1)
 		expect(fetchMock.mock.calls[0]?.[0]).toBe("https://graphql.anilist.co")
+	})
+
+	it("finds episode 12 using the romanized TVMaze alias when AniList has no streaming title", async () => {
+		const fetchMock = vi.fn(async (url: string) => {
+			if (url === "https://graphql.anilist.co") {
+				return reply({ data: { Media: { streamingEpisodes: [] } } })
+			}
+			if (url.includes("singlesearch")) {
+				return reply({ id: 80462, name: "This Monster Wants to Eat Me" })
+			}
+			if (url.endsWith("/akas")) {
+				return reply([{ name: "Watashi wo Tabetai, Hitodenashi" }])
+			}
+			if (url.endsWith("/seasons")) return reply([{ number: 1 }])
+			return reply({ name: "Beloved Child" })
+		})
+		vi.stubGlobal("fetch", fetchMock)
+		const catalog: CatalogResult = {
+			title: "Watashi wo Tabetai, Hitodenashi",
+			poster: null,
+			mediaKind: "tv",
+			episode: 12,
+			sourceUrl: "https://anilist.co/anime/183385",
+		}
+
+		expect(
+			await new EpisodeTitleResolver().resolve(
+				status("[SubsPlease] Watashi wo Tabetai, Hitodenashi - 12 (1080p).mkv"),
+				catalog,
+			),
+		).toBe("Beloved Child")
+		expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+			"https://graphql.anilist.co",
+			"https://api.tvmaze.com/singlesearch/shows?q=Watashi%20wo%20Tabetai%2C%20Hitodenashi",
+			"https://api.tvmaze.com/shows/80462/akas",
+			"https://api.tvmaze.com/shows/80462/seasons",
+			"https://api.tvmaze.com/shows/80462/episodebynumber?season=1&number=12",
+		])
+	})
+
+	it("does not assume season one for an absolute episode of a multi-season show", async () => {
+		const fetchMock = vi.fn(async (url: string) => {
+			if (url.includes("singlesearch")) return reply({ id: 8, name: "Some Show" })
+			return reply([{ number: 1 }, { number: 2 }])
+		})
+		vi.stubGlobal("fetch", fetchMock)
+
+		expect(
+			await new EpisodeTitleResolver().resolve(status("[Fansub] Some Show - 12.mkv"), null),
+		).toBeNull()
+		expect(fetchMock).toHaveBeenCalledTimes(2)
 	})
 
 	it("does not fetch episode names for a film or a video without an episode number", async () => {
