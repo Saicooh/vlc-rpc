@@ -5,6 +5,7 @@ import { registerHandler } from "@main/core/ipc"
 import { logger } from "@main/core/logger"
 import type { Client as DiscordClient } from "@main/features/discord"
 import { BrowserWindow, app, session, shell } from "electron"
+import { LOGIN_LAUNCH_ARG, shouldStartHidden } from "./app.startup"
 import type { Tray } from "./app.tray"
 
 export class Window {
@@ -53,7 +54,7 @@ export class Window {
 
 		try {
 			await this.tray.whenReady()
-			logger.info("Tray is ready, proceeding with window creation")
+			logger.info(this.tray.isAvailable() ? "Tray is ready" : "Tray unavailable; opening window")
 		} catch (error) {
 			logger.error(`Error waiting for tray: ${error}`)
 		}
@@ -102,19 +103,21 @@ export class Window {
 		})
 
 		this.mainWindow.on("ready-to-show", async () => {
-			const isFirstRun = configService.get("isFirstRun")
-			const minimizeToTray = configService.get("minimizeToTray")
-			const startWithSystem = configService.get("startWithSystem")
+			const config = configService.get()
 			const launchedAtStartup = this.wasLaunchedAtStartup()
 
-			const shouldStartMinimized =
-				!isFirstRun && minimizeToTray && startWithSystem && launchedAtStartup
+			const shouldStartMinimized = shouldStartHidden(
+				config,
+				this.tray.isAvailable(),
+				launchedAtStartup,
+				process.argv,
+			)
 
 			if (shouldStartMinimized) {
-				logger.info("Starting minimized to system tray (launched at system startup)")
+				logger.info("Starting with the window hidden in the tray")
 			} else {
 				logger.info(
-					`Showing main window (isFirstRun: ${isFirstRun}, minimizeToTray: ${minimizeToTray}, startWithSystem: ${startWithSystem}, launchedAtStartup: ${launchedAtStartup})`,
+					`Showing main window (isFirstRun: ${config.isFirstRun}, minimizeToTray: ${config.minimizeToTray}, startWithSystem: ${config.startWithSystem}, launchedAtStartup: ${launchedAtStartup})`,
 				)
 				this.mainWindow?.show()
 			}
@@ -128,7 +131,7 @@ export class Window {
 		// @ts-ignore - 'minimize' event exists but TypeScript definitions might be incomplete
 		this.mainWindow.on("minimize", (event: Electron.Event) => {
 			const minimizeToTray = configService.get("minimizeToTray")
-			if (minimizeToTray) {
+			if (minimizeToTray && this.tray.isAvailable()) {
 				event.preventDefault()
 				this.mainWindow?.hide()
 			}
@@ -137,7 +140,7 @@ export class Window {
 		this.mainWindow.on("close", (event) => {
 			if (!app.isQuitting) {
 				const minimizeToTray = configService.get("minimizeToTray")
-				if (minimizeToTray) {
+				if (minimizeToTray && this.tray.isAvailable()) {
 					event.preventDefault()
 					this.mainWindow?.hide()
 					return
@@ -174,31 +177,7 @@ export class Window {
 	}
 
 	private wasLaunchedAtStartup(): boolean {
-		if (
-			Object.prototype.hasOwnProperty.call(app, "wasLaunchedAtStartup") &&
-			app.wasLaunchedAtStartup
-		) {
-			return true
-		}
-
-		const launchArgs = process.argv.slice(1).join(" ").toLowerCase()
-		if (
-			launchArgs.includes("--autostart") ||
-			launchArgs.includes("--startup") ||
-			launchArgs.includes("--launch-at-login") ||
-			launchArgs.includes("--autorun")
-		) {
-			return true
-		}
-
-		if (process.platform === "win32") {
-			const execPath = process.execPath.toLowerCase()
-			if (execPath.includes("\\appdata\\") && !is.dev) {
-				return true
-			}
-		}
-
-		return false
+		return app.wasLaunchedAtStartup || process.argv.includes(LOGIN_LAUNCH_ARG)
 	}
 
 	public showWindow(): void {

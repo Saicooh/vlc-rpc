@@ -1,3 +1,4 @@
+import { configService } from "@main/core/config"
 import { registerHandler } from "@main/core/ipc"
 import { logger } from "@main/core/logger"
 import type { Startup } from "./app.startup"
@@ -9,6 +10,12 @@ export class AppInfoHandler {
 	}
 
 	private registerHandlers(): void {
+		registerHandler("app:set-start-with-system", (enabled) => {
+			if (!this.startup.setStartAtLogin(enabled)) return false
+			configService.set("startWithSystem", enabled)
+			return true
+		})
+
 		registerHandler("app:is-portable", async () => {
 			try {
 				const isPortable = this.startup.isPortable()

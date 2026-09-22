@@ -23,6 +23,7 @@ export interface AppConfig {
 	isFirstRun: boolean
 	minimizeToTray: boolean
 	startWithSystem: boolean
+	startMinimized?: boolean
 	/** Keyed by file path. */
 	fileMetadata: Record<string, FileMetadata>
 	rpcEnabled: boolean

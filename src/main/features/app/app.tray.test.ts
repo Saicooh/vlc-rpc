@@ -6,7 +6,7 @@ import type { Startup } from "./app.startup"
 
 const { store, captured } = vi.hoisted(() => ({
 	store: { value: {} as Record<string, unknown> },
-	captured: { template: [] as MenuItemConstructorOptions[] },
+	captured: { template: [] as MenuItemConstructorOptions[], failTray: false },
 }))
 
 vi.mock("@main/core/logger", () => ({
@@ -43,6 +43,9 @@ vi.mock("electron-conf/main", () => ({
 
 vi.mock("electron", () => ({
 	Tray: class {
+		constructor() {
+			if (captured.failTray) throw new Error("No tray host")
+		}
 		setIgnoreDoubleClickEvents(): void {}
 		setToolTip(): void {}
 		setContextMenu(): void {}
@@ -123,6 +126,7 @@ function rpcItem(): MenuItemConstructorOptions {
 // while that clock is still the one holding its handles.
 beforeEach(() => {
 	vi.useFakeTimers()
+	captured.failTray = false
 })
 
 afterEach(() => {
@@ -134,6 +138,13 @@ afterEach(() => {
 })
 
 describe("Tray Rich Presence entry", () => {
+	it("settles readiness when both tray creation attempts fail", async () => {
+		captured.failTray = true
+		const { tray } = makeTray()
+
+		await expect(tray.whenReady()).resolves.toBeUndefined()
+		expect(tray.isAvailable()).toBe(false)
+	})
 	it("agrees with the client while the presence is enabled", () => {
 		const { discord } = makeTray()
 

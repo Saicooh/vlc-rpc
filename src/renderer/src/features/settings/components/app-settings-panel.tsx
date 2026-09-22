@@ -3,7 +3,7 @@ import { Input } from "@renderer/components/ui/input"
 import { Panel, Row } from "@renderer/components/ui/panel"
 import { Switch } from "@renderer/components/ui/switch"
 import { logger } from "@renderer/lib/utils"
-import { saveConfig } from "@renderer/stores/config.store"
+import { loadConfig, saveConfig } from "@renderer/stores/config.store"
 import type { AppConfig } from "@shared/config/app-config"
 import { useState } from "react"
 
@@ -33,12 +33,25 @@ export function AppSettingsPanel({
 	canStartWithSystem,
 }: AppSettingsPanelProps): JSX.Element {
 	const [cache, setCache] = useState<CacheState>({ kind: "idle" })
+	const [startupError, setStartupError] = useState<string | null>(null)
 
-	async function handleToggleOption(option: "minimizeToTray" | "startWithSystem"): Promise<void> {
+	async function handleToggleOption(
+		option: "minimizeToTray" | "startWithSystem" | "startMinimized",
+	): Promise<void> {
 		try {
+			if (option === "startWithSystem") {
+				setStartupError(null)
+				const saved = await window.api.app.setStartWithSystem(!config.startWithSystem)
+				if (!saved) throw new Error("Could not update the Windows login item")
+				await loadConfig()
+				return
+			}
 			await saveConfig(option, !config[option])
 		} catch (error) {
 			logger.error(`Failed to toggle ${option}: ${error}`)
+			if (option === "startWithSystem") {
+				setStartupError("Could not change the Windows startup setting. Try again.")
+			}
 		}
 	}
 
@@ -61,7 +74,7 @@ export function AppSettingsPanel({
 			<Row
 				htmlFor="minimizeToTray"
 				label="Keep running in the tray when you minimize"
-				description="Closing the window still quits the app."
+				description="Closing or minimizing keeps the app in the tray."
 				control={
 					<Switch
 						id="minimizeToTray"
@@ -70,12 +83,32 @@ export function AppSettingsPanel({
 					/>
 				}
 			/>
+			<Row
+				htmlFor="startMinimized"
+				label="Start in the tray"
+				description="Keep the window hidden on launch, including when you open the app yourself."
+				control={
+					<Switch
+						id="startMinimized"
+						checked={config.startMinimized === true}
+						onChange={() => handleToggleOption("startMinimized")}
+					/>
+				}
+			/>
 
 			{canStartWithSystem && (
 				<Row
 					htmlFor="startWithSystem"
 					label="Start when Windows starts"
-					description="The app is already running when you open your first file."
+					description={
+						startupError ? (
+							<span role="alert" className="text-danger-text">
+								{startupError}
+							</span>
+						) : (
+							"Launch at sign-in; the window stays hidden if the tray option is on."
+						)
+					}
 					control={
 						<Switch
 							id="startWithSystem"

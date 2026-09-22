@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	isFirstRun: true,
 	minimizeToTray: true,
 	startWithSystem: true,
+	startMinimized: false,
 	fileMetadata: {},
 	rpcEnabled: true,
 	customButtonEnabled: false,

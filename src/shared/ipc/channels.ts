@@ -159,6 +159,7 @@ export interface IpcInvokeChannelMap {
 	// ── System ──────────────────────────────────────────────────────────────
 	"system:platform": { request: []; response: string }
 	"app:is-portable": { request: []; response: boolean }
+	"app:set-start-with-system": { request: [enabled: boolean]; response: boolean }
 }
 
 // ─── Push Events (Main → Renderer, one-way) ────────────────────────────────

@@ -34,16 +34,12 @@ if (!gotTheLock) {
 	logger.info("Another instance is already running. Quitting this one.")
 	app.quit()
 } else {
-	const launchArgs = process.argv.slice(1).join(" ").toLowerCase()
-	app.wasLaunchedAtStartup =
-		launchArgs.includes("--autostart") ||
-		launchArgs.includes("--startup") ||
-		launchArgs.includes("--launch-at-login") ||
-		launchArgs.includes("--autorun")
+	app.wasLaunchedAtStartup = process.argv.includes(App.LOGIN_LAUNCH_ARG)
 
 	// Assigned once the composition root below runs inside whenReady(). A
 	// second-instance launch that beats it finds undefined and no-ops.
 	let window: App.Window | undefined
+	let tray: App.Tray | undefined
 
 	app.on("second-instance", () => {
 		logger.info("Another instance tried to launch, focusing our window instead")
@@ -52,7 +48,7 @@ if (!gotTheLock) {
 
 	app.on("window-all-closed", (): void => {
 		const minimizeToTray = configService.get("minimizeToTray")
-		if (!minimizeToTray) {
+		if (!minimizeToTray || !tray?.isAvailable()) {
 			app.quit()
 		}
 	})
@@ -136,7 +132,7 @@ if (!gotTheLock) {
 		)
 
 		// The tray/window cycle, resolved in fixed order
-		const tray = new App.Tray(startup, discord)
+		tray = new App.Tray(startup, discord)
 		window = new App.Window(discord, tray)
 		tray.setWindow(window)
 

@@ -122,6 +122,11 @@ The app lives in the system tray, and closing the window does not quit it. Right
 icon to turn Rich Presence off, or to turn it off for 15 minutes, an hour, or two hours, which is
 what you want when you are watching something you would rather not broadcast.
 
+An installed copy can start with Windows. Those launches start in the tray when "Keep running in
+the tray" is enabled; opening the app yourself shows the window. To keep the window hidden on
+every launch, turn on "Start in the tray" in Settings or pass `--start-minimized` on the command
+line. If the tray is unavailable, the window opens so the app remains accessible.
+
 A new release announces itself with a button in the window header, next to the VLC and Discord
 chips, and there is nothing there the rest of the time, so an empty header means you are current.
 An installed copy reads "Update to 5.0.1", downloads it and restarts to finish. A portable copy

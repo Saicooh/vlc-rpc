@@ -21,7 +21,7 @@ vi.mock("electron", () => ({
 	},
 }))
 
-import { Startup } from "./app.startup"
+import { LOGIN_LAUNCH_ARG, START_MINIMIZED_ARG, Startup, shouldStartHidden } from "./app.startup"
 
 const INSTALLED: InstallKind = { kind: "installed" }
 const RENAMED_PORTABLE: InstallKind = { kind: "portable", reason: "portable-launcher" }
@@ -49,6 +49,7 @@ describe("Deciding whether a copy may start with Windows", () => {
 		expect(electronMock.setLoginItemSettings).toHaveBeenCalledTimes(1)
 		expect(electronMock.setLoginItemSettings.mock.calls[0]?.[0]).toMatchObject({
 			openAtLogin: true,
+			args: [LOGIN_LAUNCH_ARG],
 		})
 	})
 
@@ -67,5 +68,29 @@ describe("Deciding whether a copy may start with Windows", () => {
 		new Startup(INSTALLED).setStartAtLogin(true)
 
 		expect(electronMock.setLoginItemSettings).not.toHaveBeenCalled()
+	})
+})
+
+describe("Window visibility on launch", () => {
+	const config = {
+		isFirstRun: false,
+		minimizeToTray: true,
+		startWithSystem: true,
+		startMinimized: false,
+	}
+
+	it("shows a manual launch even when Start with System is enabled", () => {
+		expect(shouldStartHidden(config, true, false, [])).toBe(false)
+	})
+
+	it("hides a login launch and an explicit minimized launch", () => {
+		expect(shouldStartHidden(config, true, true, [LOGIN_LAUNCH_ARG])).toBe(true)
+		expect(shouldStartHidden(config, true, false, [START_MINIMIZED_ARG])).toBe(true)
+		expect(shouldStartHidden({ ...config, startMinimized: true }, true, false, [])).toBe(true)
+	})
+
+	it("opens the window when the tray failed or setup is unfinished", () => {
+		expect(shouldStartHidden(config, false, true, [LOGIN_LAUNCH_ARG])).toBe(false)
+		expect(shouldStartHidden({ ...config, isFirstRun: true }, true, true, [])).toBe(false)
 	})
 })

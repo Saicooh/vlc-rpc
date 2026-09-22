@@ -115,6 +115,10 @@ export class Tray {
 		return this.readyPromise
 	}
 
+	public isAvailable(): boolean {
+		return this.tray !== null && !this.tray.isDestroyed()
+	}
+
 	private initTray(): void {
 		try {
 			if (this.tray && !this.tray.isDestroyed()) {
@@ -218,6 +222,10 @@ export class Tray {
 			}
 		} catch (error) {
 			logger.error(`Fallback tray initialization failed: ${error}`)
+			this.window?.showWindow()
+		} finally {
+			this.readyResolver?.()
+			this.readyResolver = null
 		}
 	}
 
@@ -294,8 +302,9 @@ export class Tray {
 					checked: config.startWithSystem,
 					click: () => {
 						const newValue = !config.startWithSystem
-						configService.set("startWithSystem", newValue)
-						this.startup.setStartAtLogin(newValue)
+						if (this.startup.setStartAtLogin(newValue)) {
+							configService.set("startWithSystem", newValue)
+						}
 					},
 				})
 			}
