@@ -1,7 +1,7 @@
 import type { Candidate, CatalogResult } from "@main/features/catalog"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { VideoResolver, extractGoogleImageUrl } from "./cover.video"
+import { VideoResolver } from "./cover.video"
 
 vi.mock("@main/core/logger", () => ({
 	logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
@@ -67,22 +67,61 @@ describe("VideoResolver", () => {
 		})
 	})
 
-	it("falls back to Google and links the result to IMDb", async () => {
+	it("gets a film poster from Wikipedia's exact film page", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => ({
 				ok: true,
-				text: async () => '<img src="https://encrypted-tbn0.gstatic.com/poster.jpg">',
+				json: async () => ({
+					query: {
+						redirects: [{ from: "The Matrix (1999 film)", to: "The Matrix" }],
+						pages: [
+							{
+								title: "The Matrix",
+								thumbnail: {
+									source: "https://upload.wikimedia.org/wikipedia/en/d/db/The_Matrix.png",
+									width: 260,
+									height: 376,
+								},
+							},
+						],
+					},
+				}),
 			})),
 		)
 		const resolver = new VideoResolver({ searchBest: async () => null })
 
 		expect(await resolver.resolve(status("The.Matrix.1999.mkv"))).toEqual({
-			imageUrl: "https://encrypted-tbn0.gstatic.com/poster.jpg",
-			sourceUrl: "https://www.imdb.com/find/?q=The%20Matrix",
-			sourceName: "IMDB",
+			imageUrl: "https://upload.wikimedia.org/wikipedia/en/d/db/The_Matrix.png",
+			sourceUrl: "https://en.wikipedia.org/wiki/The_Matrix",
+			sourceName: "Wikipedia",
 			canonicalTitle: null,
 		})
+	})
+
+	it("does not use an unrelated page or tiny image as a poster", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => ({
+				ok: true,
+				json: async () => ({
+					query: {
+						pages: [
+							{
+								title: "The Matrix (franchise)",
+								thumbnail: { source: "https://example.test/wrong.jpg", width: 500, height: 700 },
+							},
+							{
+								title: "The Matrix (film)",
+								thumbnail: { source: "https://example.test/icon.png", width: 40, height: 40 },
+							},
+						],
+					},
+				}),
+			})),
+		)
+		const resolver = new VideoResolver({ searchBest: async () => null })
+		expect((await resolver.resolve(status("The.Matrix.1999.mkv"))).imageUrl).toBeNull()
 	})
 
 	it("uses the AniList-first result and caches the lookup", async () => {
@@ -141,13 +180,5 @@ describe("VideoResolver", () => {
 			"JoJos Bizarre Adventure Steel Ball Run",
 			"JoJo Bizarre Adventure Steel Ball Run",
 		])
-	})
-})
-
-describe("extractGoogleImageUrl", () => {
-	it("prefers a gstatic image and ignores common interface images", () => {
-		const html =
-			'<img src="https://example.com/logo.png"><img src="https://gstatic.com/poster.jpg">'
-		expect(extractGoogleImageUrl(html)).toBe("https://gstatic.com/poster.jpg")
 	})
 })

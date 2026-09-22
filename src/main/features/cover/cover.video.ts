@@ -17,11 +17,10 @@ interface CachedVideoCover extends VideoCoverResult {
 	ttl: number
 }
 
-const GOOGLE_TIMEOUT_MS = 5000
+const WIKIPEDIA_TIMEOUT_MS = 5000
 const TVMAZE_TIMEOUT_MS = 5000
 const VIDEO_CACHE_TTL_SECONDS = 10 * 60
 const VIDEO_MISS_TTL_SECONDS = 30
-const IMDB_SEARCH_URL = "https://www.imdb.com/find/?q="
 const TVMAZE_SEARCH_URL = "https://api.tvmaze.com/singlesearch/shows?q="
 const CAMEL_POSSESSIVE = /\b([A-Z][a-z]{1,})([A-Z][a-z]{1,})s\b/g
 
@@ -29,6 +28,19 @@ interface TvMazeShow {
 	name: string
 	url?: string | null
 	image?: { original?: string | null; medium?: string | null } | null
+}
+
+interface WikipediaPage {
+	title: string
+	missing?: boolean
+	thumbnail?: { source?: string; width?: number; height?: number }
+}
+
+interface WikipediaReply {
+	query?: {
+		redirects?: Array<{ from: string; to: string }>
+		pages?: WikipediaPage[]
+	}
 }
 
 function emptyResult(): VideoCoverResult {
@@ -51,25 +63,7 @@ function anilistSearchTitles(parsed: ParsedVideo): string[] {
 	return [...new Set(variants)]
 }
 
-/** Extract the first content image without adding a DOM parser just for Google fallback HTML. */
-export function extractGoogleImageUrl(html: string): string | null {
-	const directImages = [...html.matchAll(/<img\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["']/gi)]
-		.map((match) => match[1])
-		.filter((url): url is string => usableImageUrl(url))
-
-	const gstatic = directImages.find((url) => url.includes("gstatic.com") && !url.endsWith(".gif"))
-	if (gstatic) return gstatic
-
-	const scriptImages = html.match(/https?:\/\/[^"'\\\s<>]+?\.(?:jpg|jpeg|png)(?:\?[^"'\\\s<>]*)?/gi)
-
-	return (
-		scriptImages?.find(
-			(url) => usableImageUrl(url) && !/icon|emoji|favicon|logo|button/i.test(url),
-		) ?? null
-	)
-}
-
-/** Video artwork keeps the old AniList-first, IMDb-linked fallback behavior. */
+/** Video artwork uses named catalogs and Wikipedia's page image API as a fallback. */
 export class VideoResolver {
 	private readonly cache = new Map<string, CachedVideoCover>()
 
@@ -141,17 +135,7 @@ export class VideoResolver {
 			}
 		}
 
-		const searchTerm =
-			parsed.season !== undefined || parsed.episode !== undefined
-				? `${parsed.title} tv show poster`
-				: `${parsed.title}${parsed.year ? ` ${parsed.year}` : ""} movie poster`
-		const imageUrl = await this.fetchImageFromGoogle(searchTerm)
-		const result: VideoCoverResult = {
-			imageUrl,
-			sourceUrl: imageUrl ? `${IMDB_SEARCH_URL}${encodeURIComponent(parsed.title)}` : null,
-			sourceName: imageUrl ? "IMDB" : null,
-			canonicalTitle: null,
-		}
+		const result = await this.fetchWikipediaPoster(parsed)
 		this.cacheResult(key, result)
 		return result
 	}
@@ -198,26 +182,59 @@ export class VideoResolver {
 		}
 	}
 
-	private async fetchImageFromGoogle(searchTerm: string): Promise<string | null> {
+	private async fetchWikipediaPoster(parsed: ParsedVideo): Promise<VideoCoverResult> {
+		const isSeries = parsed.season !== undefined || parsed.episode !== undefined
+		const titles = isSeries
+			? [`${parsed.title} (TV series)`, `${parsed.title} (television series)`]
+			: [
+					...(parsed.year ? [`${parsed.title} (${parsed.year} film)`] : []),
+					`${parsed.title} (film)`,
+				]
+		const query = new URLSearchParams({
+			action: "query",
+			format: "json",
+			formatversion: "2",
+			prop: "pageimages",
+			pithumbsize: "512",
+			pilicense: "any",
+			redirects: "1",
+			titles: titles.join("|"),
+		})
 		const controller = new AbortController()
-		const timeoutId = setTimeout(() => controller.abort(), GOOGLE_TIMEOUT_MS)
+		const timeoutId = setTimeout(() => controller.abort(), WIKIPEDIA_TIMEOUT_MS)
 
 		try {
-			const response = await fetch(
-				`https://www.google.com/search?q=${encodeURIComponent(searchTerm)}&tbm=isch`,
-				{
-					headers: {
-						"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-						Accept: "text/html,application/xhtml+xml",
-					},
-					signal: controller.signal,
-				},
-			)
-			if (!response.ok) return null
-			return extractGoogleImageUrl(await response.text())
+			const response = await fetch(`https://en.wikipedia.org/w/api.php?${query}`, {
+				headers: { "User-Agent": "VLCDiscordRP/5.0 (https://github.com/Saicooh/vlc-rpc)" },
+				signal: controller.signal,
+			})
+			if (!response.ok) return emptyResult()
+			const reply = (await response.json()) as WikipediaReply
+			const redirects = new Map(reply.query?.redirects?.map(({ from, to }) => [from, to]))
+			for (const title of titles) {
+				const resolved = redirects.get(title) ?? title
+				const page = reply.query?.pages?.find(
+					(candidate) => candidate.title === resolved && !candidate.missing,
+				)
+				const image = page?.thumbnail?.source
+				if (
+					image &&
+					usableImageUrl(image) &&
+					(page?.thumbnail?.width ?? 0) >= 100 &&
+					(page?.thumbnail?.height ?? 0) >= 100
+				) {
+					return {
+						imageUrl: image,
+						sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, "_"))}`,
+						sourceName: "Wikipedia",
+						canonicalTitle: null,
+					}
+				}
+			}
+			return emptyResult()
 		} catch (error) {
-			logger.warn(`Google video cover lookup failed: ${error}`)
-			return null
+			logger.warn(`Wikipedia video cover lookup failed: ${error}`)
+			return emptyResult()
 		} finally {
 			clearTimeout(timeoutId)
 		}

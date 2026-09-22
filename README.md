@@ -18,8 +18,8 @@ presence pipeline:
 - **Stronger AniList matching.** Uses title aliases, subtitle-aware search candidates, release-name
   cleanup, and safer scoring so common fansub names resolve to the right anime.
 - **Western TV metadata.** Series that AniList does not contain can use TVMaze for a canonical title,
-  poster, and source link. Google Images remains the fallback when a public catalog has no match.
-- **Video source buttons.** Resolved videos can expose links to AniList, TVMaze, or IMDb in Discord.
+  poster, and source link. Wikipedia page images back up films and series without a catalog poster.
+- **Video source buttons.** Resolved videos can expose links to AniList, TVMaze, or Wikipedia in Discord.
   The optional custom profile button is shown for AniList-identified anime, not unrelated western TV.
 - **Syncplay presence.** Detects an active Syncplay session and changes the Discord presence indicator
   to show that playback is shared.
@@ -45,7 +45,7 @@ graph LR
     A[VLC Media Player] -->|HTTP interface| B[VLC Discord RP]
     B -->|filename and tags| D[Identification]
     D -->|title, season, episode| B
-    D -->|cover art lookup| E[AniList / TVMaze / Google Images / iTunes / MusicBrainz]
+    D -->|cover art lookup| E[AniList / TVMaze / Wikipedia / iTunes / MusicBrainz]
     B -->|Rich Presence| C[Discord]
 ```
 
@@ -67,8 +67,8 @@ cover than the wrong one, so a weak match is discarded.
 | Audio with usable tags | iTunes Search, then MusicBrainz and the Cover Art Archive | No |
 | Audio with no usable tags | The sound itself, see below | No |
 | Anime | AniList | No |
-| Western television | TVMaze, then Google Images | No |
-| Films | AniList for anime films, then Google Images | No |
+| Western television | TVMaze, then Wikipedia page image | No |
+| Films | AniList for anime films, then Wikipedia page image | No |
 
 A file ripped from YouTube usually has no artist and a title that is really its
 filename, so no text search can find it. For those the app computes an acoustic
@@ -180,7 +180,7 @@ These are real, and worth knowing before you file a bug.
 
 **Non-anime video lookups are best effort.** TVMaze provides public metadata and posters for many
 western series without credentials. Films and series that TVMaze cannot identify fall back to a
-Google Images lookup, with an IMDb search link when an image is found. A correction is still the
+poster from an exact Wikipedia film or TV page. A correction is still the
 reliable answer when a title has an unusual name or the public sources disagree.
 
 **Blu-Ray discs:** The app reads the playing URI from VLC's playlist. For a named rip folder it
