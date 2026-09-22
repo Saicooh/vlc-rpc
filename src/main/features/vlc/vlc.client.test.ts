@@ -53,6 +53,7 @@ function throwOnFetch(error: unknown): void {
 
 afterEach(() => {
 	vi.unstubAllGlobals()
+	vi.useRealTimers()
 	mockVlcConfig.httpEnabled = true
 	mockStatusTimeout.value = 2000
 })
@@ -61,6 +62,56 @@ afterEach(() => {
 // language VLC, which is the point: see the mediaType test below.
 
 describe("readStatus", () => {
+	it("retries a transient playlist failure even when the status body has not changed", async () => {
+		vi.useFakeTimers()
+		vi.setSystemTime(new Date("2026-09-22T00:00:00Z"))
+		const client = new Client()
+		const raw = JSON.parse(fixture("video-movie.status"))
+		raw.information.category.meta.title = "UPXX-1016"
+		raw.information.category.meta.filename = "index.bdmv"
+		const statusBody = JSON.stringify(raw)
+		let playlistReads = 0
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				if (url.endsWith("playlist.json")) {
+					playlistReads++
+					return {
+						status: playlistReads === 1 ? 503 : 200,
+						text: async () =>
+							JSON.stringify({
+								ro: "ro",
+								type: "node",
+								name: "Playlist",
+								id: "0",
+								children: [
+									{
+										ro: "ro",
+										type: "leaf",
+										name: "Disc",
+										id: "3",
+										current: "current",
+										uri: "bluray:///D:/The.Matrix.1999/BDMV/",
+									},
+								],
+							}),
+					}
+				}
+				return { status: 200, text: async () => statusBody }
+			}),
+		)
+
+		const first = await client.readStatus(false)
+		const beforeRetry = await client.readStatus(false)
+		expect(beforeRetry?.media.sourceUri).toBeUndefined()
+		expect(playlistReads).toBe(1)
+		vi.setSystemTime(new Date("2026-09-22T00:00:05Z"))
+		const recovered = await client.readStatus(false)
+		expect(first?.media.sourceUri).toBeUndefined()
+		expect(recovered?.media.title).toBe("The Matrix 1999")
+		expect(playlistReads).toBe(2)
+	})
+
 	it("reads a Blu-Ray URI once and uses a named folder instead of a disc product code", async () => {
 		const client = new Client()
 		const raw = JSON.parse(fixture("video-movie.status"))

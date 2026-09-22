@@ -24,7 +24,9 @@ vi.mock("@main/core/config", () => ({
 				? mockPresenceUpdateInterval.value
 				: key === "hideActivityWhenPaused"
 					? mockHideWhenPaused.value
-					: {},
+					: key === "largeImage"
+						? "vlc_logo"
+						: {},
 		set: () => {},
 		delete: () => {},
 	},
@@ -125,6 +127,44 @@ function fakePresence(data: DiscordPresenceData | null = PRESENCE) {
 }
 
 describe("DiscordRpcHandler update loop", () => {
+	it("retries a missing cover during the same playback and sends it when found", async () => {
+		vi.useFakeTimers()
+		const clock = new FakeClock()
+		const discord = fakeDiscord()
+		let image = "vlc_logo"
+		const presence = {
+			getDiscordPresence: async () => ({ details: "Film", large_image: image }),
+		} as unknown as PresenceService
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() =>
+				status({
+					playback: { position: 0.1, time: 10 + clock.now() / 1000, duration: 200, rate: 1 },
+				}),
+			),
+			presence,
+			clock,
+		)
+
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(1)
+
+		clock.advance(30_000)
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(1)
+		expect(handler.getLastPresence()).toMatchObject({ kind: "sent", sentAt: 0 })
+
+		clock.advance(30_000)
+		image = "https://example.test/poster.jpg"
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(2)
+		expect(handler.getLastPresence()).toMatchObject({
+			kind: "sent",
+			presence: { large_image: image },
+		})
+	})
+
 	it("clears on pause when opted in and sends again on resume", async () => {
 		vi.useFakeTimers()
 		const discord = fakeDiscord()

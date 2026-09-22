@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util"
 import type { Clock } from "@main/core/clock"
 import { configService } from "@main/core/config"
 import { registerHandler } from "@main/core/ipc"
@@ -8,12 +9,15 @@ import type { Client as VlcClient } from "@main/features/vlc"
 import type { LastSentPresence, PresenceClearReason } from "@shared/presence/presence.types"
 import type { Client as DiscordClient } from "./discord.client"
 
+const ARTWORK_RETRY_MS = 30_000
+
 export class DiscordRpcHandler {
 	private pollIntervalId: NodeJS.Timeout | null = null
 	private readonly timeline: Timeline
 	private lastSentKey: string | null = null
 	private wasConnected = false
 	private presenceCleared = false
+	private nextArtworkRetryAt = 0
 	private lastPresence: LastSentPresence = { kind: "unknown" }
 
 	constructor(
@@ -121,6 +125,7 @@ export class DiscordRpcHandler {
 		this.lastSentKey = null
 		this.wasConnected = false
 		this.presenceCleared = false
+		this.nextArtworkRetryAt = 0
 		this.lastPresence = { kind: "cleared", reason: "loop-stopped" }
 
 		this.discord.clear().catch((error) => {
@@ -159,8 +164,14 @@ export class DiscordRpcHandler {
 
 			const window = this.timeline.update(vlcStatus)
 			const key = presenceKey(vlcStatus, this.timeline.currentEpoch)
+			const sameKey = key === this.lastSentKey
+			const retryArtwork =
+				sameKey &&
+				this.lastPresence.kind === "sent" &&
+				this.lastPresence.presence.large_image === configService.get("largeImage") &&
+				this.clock.now() >= this.nextArtworkRetryAt
 
-			if (!force && !justReconnected && key === this.lastSentKey) {
+			if (!force && !justReconnected && sameKey && !retryArtwork) {
 				return true
 			}
 
@@ -168,11 +179,25 @@ export class DiscordRpcHandler {
 			if (!presenceData) {
 				return this.pushClear("playback-stopped")
 			}
+			if (
+				retryArtwork &&
+				!force &&
+				!justReconnected &&
+				this.lastPresence.kind === "sent" &&
+				isDeepStrictEqual(presenceData, this.lastPresence.presence)
+			) {
+				this.nextArtworkRetryAt = this.clock.now() + ARTWORK_RETRY_MS
+				return true
+			}
 
 			const sent = await this.discord.update(presenceData)
 			if (sent) {
 				this.lastSentKey = key
 				this.presenceCleared = false
+				this.nextArtworkRetryAt =
+					presenceData.large_image === configService.get("largeImage")
+						? this.clock.now() + ARTWORK_RETRY_MS
+						: 0
 				// Recorded only once Discord accepted it, so a refused update never
 				// shows up as an activity nobody can see.
 				this.lastPresence = {
@@ -196,6 +221,7 @@ export class DiscordRpcHandler {
 	 */
 	private async pushClear(reason: PresenceClearReason): Promise<boolean> {
 		this.lastSentKey = null
+		this.nextArtworkRetryAt = 0
 		this.lastPresence = { kind: "cleared", reason }
 
 		if (this.presenceCleared) {

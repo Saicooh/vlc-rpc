@@ -6,6 +6,8 @@ import type { VlcConnectionReason, VlcConnectionStatus, VlcStatus } from "@share
 import { detectVideoStream } from "./vlc.mapper"
 import type { VlcMetadata, VlcPlaylistItem, VlcPlaylistResponse, VlcRawStatus } from "./vlc.types"
 
+const VIDEO_URI_RETRY_MS = 5000
+
 /** Drops a trailing media extension, and only that: a dot inside a title stays. */
 function stripExtension(filename: string): string {
 	return filename.replace(/\.[a-z0-9]{2,4}$/i, "")
@@ -45,6 +47,8 @@ export class Client {
 	private authHeader: Record<string, string> = {}
 	private lastVideoUriKey: string | null = null
 	private lastVideoUri: string | null = null
+	private lastVideoUriAttemptKey: string | null = null
+	private nextVideoUriRetryAt = 0
 
 	constructor() {
 		this.updateConnectionInfo()
@@ -128,7 +132,17 @@ export class Client {
 
 			const contentHash = createHash("md5").update(content).digest("hex")
 
-			if (contentHash === this.lastStatusHash && !forceUpdate && this.lastStatus) {
+			const uriUnresolved =
+				this.lastStatus &&
+				this.needsVideoUri(this.lastStatus) &&
+				this.lastStatus.media.sourceUri === undefined &&
+				Date.now() >= this.nextVideoUriRetryAt
+			if (
+				contentHash === this.lastStatusHash &&
+				!forceUpdate &&
+				this.lastStatus &&
+				!uriUnresolved
+			) {
 				return this.lastStatus
 			}
 
@@ -311,16 +325,19 @@ export class Client {
 		status: VlcStatus,
 		information?: VlcRawStatus["information"],
 	): Promise<void> {
-		if (
-			status.mediaType !== "video" &&
-			!/\.bdmv$/i.test(status.media.filename ?? "") &&
-			!/^[a-z]{2,8}[-_ ]?\d{3,}$/i.test(status.media.title ?? "")
-		)
-			return
+		if (!this.needsVideoUri(status)) return
 		const key = `${status.plid ?? "none"}|${status.media.filename ?? status.media.title ?? ""}`
 		if (key !== this.lastVideoUriKey) {
-			this.lastVideoUri = await this.getCurrentFileUri()
-			this.lastVideoUriKey = key
+			if (key !== this.lastVideoUriAttemptKey || Date.now() >= this.nextVideoUriRetryAt) {
+				this.lastVideoUri = await this.getCurrentFileUri()
+				this.lastVideoUriAttemptKey = key
+				// A missing playlist item can be transient. Retain only successful reads,
+				// and space retries so an unavailable endpoint is not hit every poll.
+				this.lastVideoUriKey = this.lastVideoUri ? key : null
+				this.nextVideoUriRetryAt = this.lastVideoUri ? 0 : Date.now() + VIDEO_URI_RETRY_MS
+			} else {
+				this.lastVideoUri = null
+			}
 		}
 		status.media.sourceUri = this.lastVideoUri ?? undefined
 		if (isBluRaySource(this.lastVideoUri ?? undefined)) {
@@ -341,6 +358,14 @@ export class Client {
 				status.media.filename = title
 			}
 		}
+	}
+
+	private needsVideoUri(status: VlcStatus): boolean {
+		return (
+			status.mediaType === "video" ||
+			/\.bdmv$/i.test(status.media.filename ?? "") ||
+			/^[a-z]{2,8}[-_ ]?\d{3,}$/i.test(status.media.title ?? "")
+		)
 	}
 
 	/** The URI of the item the playlist marks as current, which status.json does not carry. */
