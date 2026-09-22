@@ -96,6 +96,14 @@ describe("videoVariables", () => {
 		expect(videoVariables({ title: "x", episode: 5 }).episodeInfo).toBe("Episode 5")
 	})
 
+	it("adds a known episode title without changing the numbered fallback", () => {
+		expect(
+			videoVariables({ title: "Re:ZERO", season: 5, episode: 17, episodeTitle: "Good Loser" })
+				.episodeInfo,
+		).toBe("S5E17 · Good Loser")
+		expect(videoVariables({ title: "Film", episodeTitle: "Good Loser" }).episodeInfo).toBe("")
+	})
+
 	it("leaves the episode marker empty for a file with no season or episode", () => {
 		expect(videoVariables({ title: "x" }).episodeInfo).toBe("")
 	})

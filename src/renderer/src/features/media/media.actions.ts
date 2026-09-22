@@ -39,6 +39,7 @@ export async function refreshMediaInfo(): Promise<void> {
 				contentImageSourceUrl: null,
 				season: null,
 				episode: null,
+				episodeTitle: null,
 				year: null,
 				overrideKey: null,
 				overrideActive: false,
@@ -71,8 +72,9 @@ export async function refreshMediaInfo(): Promise<void> {
 			artist: mediaInfo.content_metadata?.artist || mediaInfo.media?.artist || null,
 			fileTitle,
 			mediaType: mediaInfo.mediaType || mediaStore.get().mediaType,
-			season: mediaInfo.content_metadata?.season || null,
-			episode: mediaInfo.content_metadata?.episode || null,
+			season: mediaInfo.content_metadata?.season ?? null,
+			episode: mediaInfo.content_metadata?.episode ?? null,
+			episodeTitle: mediaInfo.content_metadata?.episode_title ?? null,
 			year: mediaInfo.content_metadata?.year || null,
 			// Written together or not at all by the handler, so an absent key means
 			// the store would refuse this file rather than that nothing is playing.

@@ -25,6 +25,8 @@ presence pipeline:
   to show that playback is shared.
 - **Better VLC metadata handling.** Keeps VLC's real filename separate from its display title, which
   makes catalog parsing reliable even when VLC reports a shortened or cleaned title.
+- **Episode names in Discord.** When the file name or VLC tags include an episode title, the
+  presence shows it beside the season and episode number. Number-only files keep the number.
 
 The upstream project is [VLC Discord RP](https://github.com/valentin-marquez/vlc-rpc). This fork is
 published at [Saicooh/vlc-rpc](https://github.com/Saicooh/vlc-rpc).

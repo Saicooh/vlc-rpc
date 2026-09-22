@@ -57,6 +57,7 @@ export const SAMPLE_EPISODE: VideoFacts = {
 	title: "Breaking Bad",
 	season: 2,
 	episode: 5,
+	episodeTitle: "The Long Night",
 	year: 2009,
 }
 export const SAMPLE_FILM: VideoFacts = { title: "The Matrix", year: 1999 }

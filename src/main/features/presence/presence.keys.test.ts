@@ -72,6 +72,12 @@ describe("presenceKey", () => {
 		expect(presenceKey(first, 0)).not.toBe(presenceKey(covered, 0))
 	})
 
+	it("changes when VLC discovers an episode title during the same playback", () => {
+		const first = status({ media: { title: "episode-17.mkv", showName: "Re:ZERO", episode: 17 } })
+		const named = status({ media: { ...first.media, episodeTitle: "Good Loser" } })
+		expect(presenceKey(first, 0)).not.toBe(presenceKey(named, 0))
+	})
+
 	it("changes when a Blu-Ray advances to the next chapter", () => {
 		const first = status({ disc: { title: 1, chapter: 1 } })
 		const next = status({ disc: { title: 1, chapter: 2 } })

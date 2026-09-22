@@ -83,7 +83,7 @@ interface PresenceLines {
 }
 
 function videoFacts(
-	rawTitle: string,
+	media: VlcStatus["media"],
 	catalogResult: CatalogResult | null,
 	localParse: ParsedVideo | null,
 	canonicalTitle: string | null,
@@ -91,22 +91,34 @@ function videoFacts(
 ): VideoFacts {
 	const isTvShow = catalogResult
 		? catalogResult.mediaKind === "tv"
-		: localParse?.season !== undefined || localParse?.episode !== undefined
+		: media.showName !== undefined ||
+			media.season !== undefined ||
+			media.episode !== undefined ||
+			localParse?.season !== undefined ||
+			localParse?.episode !== undefined
 
 	const title =
-		firstNonEmpty(catalogResult?.title, canonicalTitle ?? undefined, localParse?.title, rawTitle) ??
-		""
-	const subtitle = localParse?.subtitle
-	const displayTitle =
+		firstNonEmpty(
+			catalogResult?.title,
+			canonicalTitle ?? undefined,
+			media.showName,
+			localParse?.title,
+			media.title,
+		) ?? ""
+	const subtitle = firstNonEmpty(media.episodeTitle, localParse?.subtitle)
+	const distinctSubtitle =
 		subtitle && !title.toLocaleLowerCase().includes(subtitle.toLocaleLowerCase())
-			? `${title}: ${subtitle}`
-			: title
+			? subtitle
+			: undefined
 
 	return {
-		title: displayTitle,
+		title: !isTvShow && distinctSubtitle ? `${title}: ${distinctSubtitle}` : title,
+		episodeTitle: isTvShow ? distinctSubtitle : undefined,
 		// A film whose filename happens to parse a season must not grow an episode.
-		season: isTvShow ? (catalogResult?.season ?? localParse?.season) : undefined,
-		episode: isTvShow ? (catalogResult?.episode ?? localParse?.episode) : undefined,
+		season: isTvShow ? (media.season ?? catalogResult?.season ?? localParse?.season) : undefined,
+		episode: isTvShow
+			? (media.episode ?? catalogResult?.episode ?? localParse?.episode)
+			: undefined,
 		year: localParse?.year,
 		discTitle: disc?.title,
 		chapter: disc?.chapter,
@@ -136,7 +148,7 @@ function buildLines(
 
 	if (mediaInfo.mediaType === "video") {
 		const variables = videoVariables(
-			videoFacts(media.title ?? "", catalogResult, localParse, canonicalTitle, mediaInfo.disc),
+			videoFacts(media, catalogResult, localParse, canonicalTitle, mediaInfo.disc),
 		)
 		return {
 			details: renderLine(layout.video.details, variables),

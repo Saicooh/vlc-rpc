@@ -390,6 +390,38 @@ describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 			expect(presence?.state).toBe("S2E5")
 		})
 
+		it("shows a filename's episode title beside its number", async () => {
+			const presence = await videoService(SERIES).getDiscordPresence(
+				videoStatus("Breaking.Bad.S02E05.The.Long.Night.1080p.WEB-DL.mkv", state),
+				timeline,
+			)
+
+			expect(presence?.details).toBe("Breaking Bad")
+			expect(presence?.state).toBe("S2E5 · The Long Night")
+		})
+
+		it("does not repeat an episode title already in the canonical show title", async () => {
+			const presence = await videoService({
+				...SERIES,
+				title: "Breaking Bad: The Long Night",
+			}).getDiscordPresence(videoStatus("Breaking.Bad.S02E05.The.Long.Night.mkv", state), timeline)
+
+			expect(presence?.details).toBe("Breaking Bad: The Long Night")
+			expect(presence?.state).toBe("S2E5")
+		})
+
+		it("uses an episode title from VLC tags when the filename lacks it", async () => {
+			const status = videoStatus("episode-17.mkv", state)
+			status.media.showName = "Re:ZERO"
+			status.media.episodeTitle = "Good Loser"
+			status.media.season = 5
+			status.media.episode = 17
+			const presence = await videoService(null).getDiscordPresence(status, timeline)
+
+			expect(presence?.details).toBe("Re:ZERO")
+			expect(presence?.state).toBe("S5E17 · Good Loser")
+		})
+
 		it("shows the year below the title for a film", async () => {
 			const presence = await videoService(FILM).getDiscordPresence(
 				videoStatus("The Matrix (1999).mkv", state),

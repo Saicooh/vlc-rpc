@@ -112,6 +112,7 @@ function liveFacts(media: MediaState): VideoFacts | null {
 		title: media.title,
 		season: media.season ?? undefined,
 		episode: media.episode ?? undefined,
+		episodeTitle: media.episodeTitle ?? undefined,
 		year: media.year ?? undefined,
 		discTitle: media.discTitle,
 		chapter: media.chapter,

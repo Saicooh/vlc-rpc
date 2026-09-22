@@ -32,6 +32,7 @@ export interface MediaState {
 	contentImageSourceUrl: string | null
 	season: number | null
 	episode: number | null
+	episodeTitle: string | null
 	year: string | null
 	/**
 	 * Where a manual correction for what is playing would be filed. Null means the
@@ -70,6 +71,7 @@ const INITIAL_STATE: MediaState = {
 	contentImageSourceUrl: null,
 	season: null,
 	episode: null,
+	episodeTitle: null,
 	year: null,
 	overrideKey: null,
 	overrideActive: false,

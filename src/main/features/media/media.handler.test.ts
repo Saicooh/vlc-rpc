@@ -230,7 +230,7 @@ describe("MediaInfoHandler video content fields", () => {
 		expect(info?.content_metadata?.episode).toBeUndefined()
 	})
 
-	it("reports the identified work even when it came back without a poster", async () => {
+	it("keeps the filename episode when the identified work has no poster", async () => {
 		const handler = buildVideo({ title: "Monster", poster: null, mediaKind: "tv", season: 2 })
 
 		const info = await handler.getMediaInfo(videoStatus("Monster S02E04.mkv"))
@@ -239,7 +239,40 @@ describe("MediaInfoHandler video content fields", () => {
 		expect(info?.content_type).toBe("tv_show")
 		expect(info?.content_metadata?.clean_title).toBe("Monster")
 		expect(info?.content_metadata?.season).toBe(2)
-		expect(info?.content_metadata?.episode).toBeUndefined()
+		expect(info?.content_metadata?.episode).toBe(4)
+	})
+
+	it("reports a local episode title for the live layout preview without a catalog hit", async () => {
+		const handler = buildVideo(null)
+		const info = await handler.getMediaInfo(
+			videoStatus("Some.Show.S01E03.The.Long.Night.1080p.WEB-DL.mkv"),
+		)
+
+		expect(info?.content_type).toBe("tv_show")
+		expect(info?.content_metadata).toMatchObject({
+			clean_title: "Some Show",
+			season: 1,
+			episode: 3,
+			episode_title: "The Long Night",
+		})
+	})
+
+	it("prefers VLC episode tags over a filename that only has an episode number", async () => {
+		const handler = buildVideo(null)
+		const status = videoStatus("episode-17.mkv")
+		status.media.showName = "Re:ZERO"
+		status.media.episodeTitle = "Good Loser"
+		status.media.season = 5
+		status.media.episode = 17
+
+		const info = await handler.getMediaInfo(status)
+
+		expect(info?.content_metadata).toMatchObject({
+			clean_title: "Re:ZERO",
+			season: 5,
+			episode: 17,
+			episode_title: "Good Loser",
+		})
 	})
 
 	it("leaves the fields absent when the catalog identifies nothing", async () => {

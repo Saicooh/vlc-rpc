@@ -13,6 +13,7 @@ const FORGOTTEN = {
 	contentImageSourceUrl: null,
 	season: null,
 	episode: null,
+	episodeTitle: null,
 	year: null,
 	overrideKey: null,
 	overrideActive: false,

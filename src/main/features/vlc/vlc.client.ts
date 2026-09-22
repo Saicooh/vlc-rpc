@@ -13,6 +13,25 @@ function stripExtension(filename: string): string {
 	return filename.replace(/\.[a-z0-9]{2,4}$/i, "")
 }
 
+function taggedEpisodeTitle(
+	title: string | undefined,
+	showName: string | undefined,
+): string | undefined {
+	if (!title || !showName) return undefined
+	let candidate = title.trim()
+	const show = showName.trim()
+	if (
+		candidate.toLocaleLowerCase().startsWith(show.toLocaleLowerCase()) &&
+		(candidate.length === show.length || /^[\s:–—-]/.test(candidate.slice(show.length)))
+	) {
+		candidate = candidate.slice(show.length).replace(/^[\s:–—-]+/, "")
+	}
+	candidate = candidate
+		.replace(/^(?:S\d{1,2}E\d{1,3}|(?:Season\s+\d+\s*,?\s*)?Episode\s+\d+)\s*[-:–—]?\s*/i, "")
+		.trim()
+	return candidate && !/^\d+$/.test(candidate) ? candidate : undefined
+}
+
 /**
  * Node's fetch throws `TypeError: fetch failed` and hangs the socket error off
  * `cause`, so the refused connection that means "VLC is not open" sits one or
@@ -268,6 +287,16 @@ export class Client {
 
 		if (meta) {
 			status.media.filename = meta.filename || ""
+			if (isVideo && meta.showName?.trim()) {
+				status.media.showName = meta.showName.trim()
+				status.media.episodeTitle = taggedEpisodeTitle(meta.title, meta.showName)
+				if (meta.seasonNumber && /^\d+$/.test(meta.seasonNumber.trim())) {
+					status.media.season = Number(meta.seasonNumber)
+				}
+				if (meta.episodeNumber && /^\d+$/.test(meta.episodeNumber.trim())) {
+					status.media.episode = Number(meta.episodeNumber)
+				}
+			}
 
 			// The filename is the last resort, and it arrives with its extension.
 			// Leaving it on puts ".mp3" on the user's profile, which is the exact

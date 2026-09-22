@@ -177,6 +177,36 @@ describe("readStatus", () => {
 
 		expect(status?.media.title).toBe("Some Show S01E03")
 		expect(status?.media.filename).toBe("Some.Show.S01E03.1080p.WEB-DL.mp4")
+		expect(status?.media.episodeTitle).toBeUndefined()
+		expect(status?.media.season).toBe(1)
+		expect(status?.media.episode).toBe(3)
+	})
+
+	it("reads a tagged episode title without confusing the show and episode marker for a title", async () => {
+		const raw = JSON.parse(fixture("video-tv-show.status"))
+		raw.information.category.meta.title = "Some Show S01E03 - The Long Night"
+		respondWith(JSON.stringify(raw))
+
+		const status = await vlcStatusService.readStatus(true)
+
+		expect(status?.media.showName).toBe("Some Show")
+		expect(status?.media.episodeTitle).toBe("The Long Night")
+	})
+
+	it("reads a standalone episode title from VLC tags", async () => {
+		const raw = JSON.parse(fixture("video-tv-show.status"))
+		raw.information.category.meta.showName = "Re:ZERO"
+		raw.information.category.meta.title = "Good Loser"
+		raw.information.category.meta.seasonNumber = "05"
+		raw.information.category.meta.episodeNumber = "17"
+		respondWith(JSON.stringify(raw))
+
+		const status = await vlcStatusService.readStatus(true)
+
+		expect(status?.media.showName).toBe("Re:ZERO")
+		expect(status?.media.episodeTitle).toBe("Good Loser")
+		expect(status?.media.season).toBe(5)
+		expect(status?.media.episode).toBe(17)
 	})
 
 	it("reports paused without losing the media info", async () => {

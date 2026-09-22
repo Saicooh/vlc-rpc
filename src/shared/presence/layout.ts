@@ -222,6 +222,7 @@ export function videoChoiceFor(layout: VideoLayout): VideoLayoutChoice {
 
 export interface VideoFacts {
 	title: string
+	episodeTitle?: string | undefined
 	season?: number | undefined
 	episode?: number | undefined
 	year?: string | number | undefined
@@ -236,7 +237,11 @@ export interface VideoFacts {
  * the same way it does for a file that never named a year.
  */
 export function videoVariables(facts: VideoFacts): TemplateVariables {
-	const episodeInfo = episodeMarker(facts.season, facts.episode)
+	const marker = episodeMarker(facts.season, facts.episode)
+	const episodeInfo =
+		facts.episode !== undefined && facts.episodeTitle?.trim()
+			? `${marker} · ${facts.episodeTitle.trim()}`
+			: marker
 
 	return {
 		title: facts.title,

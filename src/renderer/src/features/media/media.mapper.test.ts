@@ -22,6 +22,7 @@ const EMPTY: MediaState = {
 	contentImageSourceUrl: null,
 	season: null,
 	episode: null,
+	episodeTitle: null,
 	year: null,
 	overrideKey: null,
 	overrideActive: false,
@@ -49,6 +50,7 @@ function resolved(): MediaState {
 		contentType: "anime",
 		season: 1,
 		episode: 11,
+		episodeTitle: "The Long Night",
 		overrideKey: "video:sousou no frieren",
 		overrideBinding: "metadata",
 		overrideActive: true,
@@ -117,6 +119,7 @@ describe("mergeVlcStatus", () => {
 		expect(state.title).toBe("Frieren.S01E12.mkv")
 		expect(state.contentType).toBeNull()
 		expect(state.episode).toBeNull()
+		expect(state.episodeTitle).toBeNull()
 		expect(state.overrideKey).toBeNull()
 		expect(state.overrideActive).toBe(false)
 	})

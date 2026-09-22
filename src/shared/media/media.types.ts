@@ -13,6 +13,7 @@ export interface ContentMetadata {
 	show_name?: string
 	season?: number
 	episode?: number
+	episode_title?: string
 	movie_name?: string
 	year?: string
 	anime_name?: string

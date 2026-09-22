@@ -1,7 +1,12 @@
 import { registerHandler } from "@main/core/ipc"
 import { logger } from "@main/core/logger"
 import type { Resolver as ArtworkResolver } from "@main/features/artwork"
-import type { Resolver as CatalogResolver, CatalogResult } from "@main/features/catalog"
+import type {
+	Resolver as CatalogResolver,
+	CatalogResult,
+	ParsedVideo,
+} from "@main/features/catalog"
+import { parse as parseVideo } from "@main/features/catalog/catalog.parser"
 import type { CoverOutcome } from "@main/features/cover"
 import type { CorrectedTags, OverrideTarget } from "@main/features/overrides"
 import type { Client as VlcClient } from "@main/features/vlc"
@@ -11,19 +16,49 @@ import type { VlcStatus } from "@shared/vlc/vlc.types"
 import type { ImageProxy } from "./media.image-proxy"
 
 /**
- * The renderer reads an absent field as unknown, so season and episode are
- * assigned only when the parse behind the catalog result actually found them.
+ * The renderer reads an absent field as unknown, so the episode fields are
+ * assigned only when VLC's tags or the local filename parse actually found them.
  */
-function toVideoMetadata(result: CatalogResult): ContentMetadata {
+function toVideoMetadata(
+	result: CatalogResult,
+	status: VlcStatus,
+	parsed: ParsedVideo,
+): ContentMetadata {
 	const metadata: ContentMetadata = { clean_title: result.title }
 
-	if (result.season !== undefined) {
-		metadata.season = result.season
+	if (result.mediaKind === "tv") {
+		const season = status.media.season ?? result.season ?? parsed.season
+		const episode = status.media.episode ?? result.episode ?? parsed.episode
+		if (season !== undefined) metadata.season = season
+		if (episode !== undefined) metadata.episode = episode
+		const episodeTitle = status.media.episodeTitle ?? parsed.subtitle
+		if (
+			metadata.episode !== undefined &&
+			episodeTitle &&
+			!result.title.toLocaleLowerCase().includes(episodeTitle.toLocaleLowerCase())
+		) {
+			metadata.episode_title = episodeTitle
+		}
 	}
-	if (result.episode !== undefined) {
-		metadata.episode = result.episode
-	}
+	return metadata
+}
 
+function localVideoMetadata(status: VlcStatus, parsed: ParsedVideo): ContentMetadata | null {
+	const season = status.media.season ?? parsed.season
+	const episode = status.media.episode ?? parsed.episode
+	if (!status.media.showName && season === undefined && episode === undefined) return null
+	const title = status.media.showName || parsed.title || status.media.title || ""
+	const metadata: ContentMetadata = { clean_title: title }
+	if (season !== undefined) metadata.season = season
+	if (episode !== undefined) metadata.episode = episode
+	const episodeTitle = status.media.episodeTitle ?? parsed.subtitle
+	if (
+		episode !== undefined &&
+		episodeTitle &&
+		!title.toLocaleLowerCase().includes(episodeTitle.toLocaleLowerCase())
+	) {
+		metadata.episode_title = episodeTitle
+	}
 	return metadata
 }
 
@@ -155,6 +190,8 @@ export class MediaInfoHandler {
 			if (vlcStatus.mediaType === "video") {
 				const localCover = await this.localVideoArtwork?.fetch(vlcStatus)
 				const catalogResult = await this.catalog.resolve(vlcStatus)
+				const videoName = vlcStatus.media.filename || vlcStatus.media.title || ""
+				const parsed = parseVideo(videoName, vlcStatus.playback.duration)
 				if (catalogResult) {
 					// A work can be identified without art, so the title and the kind
 					// are reported whether or not a poster came with them.
@@ -162,7 +199,13 @@ export class MediaInfoHandler {
 						mediaInfo.content_image_url = catalogResult.poster
 					}
 					mediaInfo.content_type = toContentType(catalogResult.mediaKind)
-					mediaInfo.content_metadata = toVideoMetadata(catalogResult)
+					mediaInfo.content_metadata = toVideoMetadata(catalogResult, vlcStatus, parsed)
+				} else {
+					const metadata = localVideoMetadata(vlcStatus, parsed)
+					if (metadata) {
+						mediaInfo.content_type = "tv_show"
+						mediaInfo.content_metadata = metadata
+					}
 				}
 
 				// Outside the branch above on purpose. A work the catalog identifies

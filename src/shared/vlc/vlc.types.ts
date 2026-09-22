@@ -18,6 +18,10 @@ export interface VlcStatus {
 		nowPlaying?: string
 		artworkUrl?: string | undefined
 		sourceUri?: string | undefined
+		showName?: string | undefined
+		episodeTitle?: string | undefined
+		season?: number | undefined
+		episode?: number | undefined
 	}
 	videoInfo?:
 		| {
