@@ -3,6 +3,7 @@ import { refreshMediaInfo } from "@renderer/features/media/media.actions"
 import { logger } from "@renderer/lib/utils"
 import type { VlcConfig } from "@shared/config/app-config"
 import { DEFAULT_CONFIG } from "@shared/config/defaults"
+import type { VlcConfigSaveResult } from "@shared/ipc/channels"
 import { vlcConfigStore, vlcConnectionReasonStore, vlcStatusStore } from "./vlc.store"
 
 let statusPollingInterval: ReturnType<typeof setInterval> | null = null
@@ -21,27 +22,28 @@ export async function loadVlcConfig(): Promise<VlcConfig | null> {
 	}
 }
 
-export async function saveVlcConfig(config: VlcConfig): Promise<VlcConfig | null> {
+export type SaveVlcConfigResult =
+	| { kind: "saved"; config: VlcConfig }
+	| { kind: Exclude<VlcConfigSaveResult, "saved"> }
+
+export async function saveVlcConfig(config: VlcConfig): Promise<SaveVlcConfigResult> {
 	try {
 		vlcStatusStore.set("connecting")
-		const success = await window.api.vlc.setupConfig(config)
+		const result = await window.api.vlc.setupConfig(config)
 
-		if (success) {
+		if (result === "saved") {
 			const updatedConfig = await window.api.vlc.getConfig()
 			vlcConfigStore.set(updatedConfig)
-			vlcStatusStore.set("connected")
-			logger.info("VLC configuration saved and connected")
-
-			startStatusPolling()
-			return updatedConfig
+			await checkVlcConnection()
+			logger.info("VLC configuration saved")
+			return { kind: "saved", config: updatedConfig }
 		}
-		vlcStatusStore.set("error")
-		logger.error("Failed to save VLC configuration")
-		return null
+		await checkVlcConnection()
+		return { kind: result }
 	} catch (error) {
 		vlcStatusStore.set("error")
 		logger.error(`Error saving VLC configuration: ${error}`)
-		return null
+		return { kind: "failed" }
 	}
 }
 
@@ -68,12 +70,11 @@ export async function checkVlcConnection(): Promise<boolean> {
 }
 
 /**
- * vlcrc is only read when VLC starts, so this cannot make a running VLC pick the change up:
- * the caller still has to tell the user to restart it.
+ * Only writes vlcrc after VLC has closed, so the next launch reads the change.
  */
-export async function repairVlcConfig(): Promise<boolean> {
+export async function repairVlcConfig(): Promise<SaveVlcConfigResult> {
 	const current = vlcConfigStore.get() ?? DEFAULT_CONFIG.vlc
-	return (await saveVlcConfig({ ...current, httpEnabled: true })) !== null
+	return await saveVlcConfig({ ...current, httpEnabled: true })
 }
 
 function startStatusPolling(interval = 2000): void {

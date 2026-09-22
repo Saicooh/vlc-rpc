@@ -1,6 +1,11 @@
 import type { ElectronAPI } from "@electron-toolkit/preload"
 import type { AppConfig, VlcConfig } from "@shared/config/app-config"
-import type { OverrideDraft, OverrideListEntry, OverrideSaveResult } from "@shared/ipc/channels"
+import type {
+	OverrideDraft,
+	OverrideListEntry,
+	OverrideSaveResult,
+	VlcConfigSaveResult,
+} from "@shared/ipc/channels"
 import type { DetectedMediaInfo } from "@shared/media/media.types"
 import type { LastSentPresence } from "@shared/presence/presence.types"
 import type {
@@ -27,7 +32,7 @@ declare global {
 			}
 			vlc: {
 				getConfig: () => Promise<VlcConfig>
-				setupConfig: (config: VlcConfig) => Promise<boolean>
+				setupConfig: (config: VlcConfig) => Promise<VlcConfigSaveResult>
 				getStatus: (forceUpdate?: boolean) => Promise<VlcStatus | null>
 				checkStatus: () => Promise<VlcConnectionStatus>
 			}

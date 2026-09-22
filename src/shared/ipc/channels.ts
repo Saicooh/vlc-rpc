@@ -67,6 +67,8 @@ export type OverrideSaveResult =
 	| { saved: false; reason: "cover-not-an-image"; contentType: string | null }
 	| { saved: false; reason: "store-refused" }
 
+export type VlcConfigSaveResult = "saved" | "vlc-running" | "process-unknown" | "failed"
+
 // ─── Invoke Channels (Renderer → Main, request/response) ────────────────────
 
 /**
@@ -80,7 +82,7 @@ export interface IpcInvokeChannelMap {
 
 	// ── VLC Config ──────────────────────────────────────────────────────────
 	"vlc:config:get": { request: []; response: VlcConfig }
-	"vlc:config:set": { request: [config: VlcConfig]; response: boolean }
+	"vlc:config:set": { request: [config: VlcConfig]; response: VlcConfigSaveResult }
 
 	// ── VLC Status ──────────────────────────────────────────────────────────
 	"vlc:status:get": { request: [forceUpdate?: boolean]; response: VlcStatus | null }

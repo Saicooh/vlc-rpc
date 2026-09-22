@@ -145,7 +145,9 @@ interface StatusChipProps {
 	onCheck: () => Promise<boolean>
 }
 
-type RepairState = { kind: "idle" } | { kind: "working" } | { kind: "done" } | { kind: "failed" }
+type RepairState = {
+	kind: "idle" | "working" | "done" | "failed" | "vlc-running" | "process-unknown"
+}
 
 /**
  * A repair rewrites vlcrc, which VLC only reads at startup, so the check that
@@ -154,7 +156,13 @@ type RepairState = { kind: "idle" } | { kind: "working" } | { kind: "done" } | {
  */
 function panelText(description: ChipDescription, repair: RepairState): [string, string] {
 	if (repair.kind === "done") {
-		return ["Turned on VLC's web interface", "Restart VLC for the change to take effect."]
+		return ["Turned on VLC's web interface", "Open VLC to apply the change."]
+	}
+	if (repair.kind === "vlc-running") {
+		return ["VLC is open", "Close VLC, then select Turn on HTTP again. Open VLC afterward."]
+	}
+	if (repair.kind === "process-unknown") {
+		return ["Could not check VLC", "Check that VLC is closed, then try again."]
 	}
 	if (repair.kind === "failed") {
 		return ["Could not turn it on", "Turn the web interface on in VLC, then restart it."]
@@ -258,7 +266,7 @@ function StatusChip({ label, description, onCheck }: StatusChipProps): JSX.Eleme
 	async function handleRepair(): Promise<void> {
 		setRepair({ kind: "working" })
 		const repaired = await repairVlcConfig()
-		setRepair(repaired ? { kind: "done" } : { kind: "failed" })
+		setRepair({ kind: repaired.kind === "saved" ? "done" : repaired.kind })
 		await checkVlcConnection()
 	}
 

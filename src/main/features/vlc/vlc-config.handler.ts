@@ -6,9 +6,11 @@ import { registerHandler } from "@main/core/ipc"
 import { logger } from "@main/core/logger"
 import type { VlcConfig } from "@shared/config/app-config"
 import { VLC_CONFIG_PATHS } from "@shared/config/defaults"
+import type { VlcConfigSaveResult } from "@shared/ipc/channels"
 
 import { parseVlcConfig } from "./vlc-config.mapper"
 import type { VlcConfigRead } from "./vlc-config.types"
+import { isVlcRunning } from "./vlc-process"
 import type { Client } from "./vlc.client"
 
 export class VlcConfigHandler {
@@ -20,7 +22,10 @@ export class VlcConfigHandler {
 	 */
 	public readonly ready: Promise<void>
 
-	constructor(private readonly vlc: Client) {
+	constructor(
+		private readonly vlc: Client,
+		private readonly processCheck = isVlcRunning,
+	) {
 		this.determineVlcConfigPath()
 		this.registerHandlers()
 		this.ready = this.synchronizeConfig()
@@ -115,11 +120,15 @@ export class VlcConfigHandler {
 	}
 
 	/** Writes the HTTP interface settings into vlcrc, keeping the rest of the file. */
-	public async setupVlcConfig(config: VlcConfig): Promise<boolean> {
+	public async setupVlcConfig(config: VlcConfig): Promise<VlcConfigSaveResult> {
 		if (!this.vlcConfigPath) {
 			logger.error("VLC config path not determined")
-			return false
+			return "failed"
 		}
+
+		const running = await this.processCheck()
+		if (running === true) return "vlc-running"
+		if (running === null) return "process-unknown"
 
 		try {
 			await fs.mkdir(path.dirname(this.vlcConfigPath), { recursive: true })
@@ -288,10 +297,10 @@ export class VlcConfigHandler {
 				enabled: config.httpEnabled,
 				hasPassword: !!config.httpPassword,
 			})
-			return true
+			return "saved"
 		} catch (error) {
 			logger.error(`Error configuring VLC: ${error}`)
-			return false
+			return "failed"
 		}
 	}
 

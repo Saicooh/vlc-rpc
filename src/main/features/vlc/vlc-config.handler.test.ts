@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -41,14 +41,17 @@ let root: string
  * with that work in flight writes into whichever test happens to be running when
  * it lands.
  */
-async function handlerFor(fixture: string | null): Promise<VlcConfigHandler> {
+async function handlerFor(
+	fixture: string | null,
+	processCheck = async (): Promise<boolean | null> => false,
+): Promise<VlcConfigHandler> {
 	const vlcDir = join(root, "vlc")
 	mkdirSync(vlcDir, { recursive: true })
 	if (fixture) {
 		copyFileSync(join(__dirname, "__fixtures__", `${fixture}.txt`), join(vlcDir, "vlcrc"))
 	}
 	process.env.APPDATA = root
-	const handler = new VlcConfigHandler(new Client())
+	const handler = new VlcConfigHandler(new Client(), processCheck)
 	await handler.ready
 	return handler
 }
@@ -134,5 +137,45 @@ describe.runIf(process.platform === "win32")("synchronizeConfig", () => {
 		await handler.synchronizeConfig()
 
 		expect(configSetCalls).toHaveLength(0)
+	})
+})
+
+describe.runIf(process.platform === "win32")("setupVlcConfig", () => {
+	it("refuses to rewrite vlcrc while VLC is open", async () => {
+		const handler = await handlerFor("vlcrc-defaults", async () => true)
+		const file = join(root, "vlc", "vlcrc")
+		const before = readFileSync(file, "utf-8")
+		configSetCalls.length = 0
+
+		const result = await handler.setupVlcConfig({
+			httpPort: 9080,
+			httpPassword: "secret",
+			httpEnabled: true,
+		})
+
+		expect(result).toBe("vlc-running")
+		expect(readFileSync(file, "utf-8")).toBe(before)
+		expect(configSetCalls).toHaveLength(0)
+	})
+
+	it("refuses to write when the process check fails", async () => {
+		const handler = await handlerFor(null, async () => null)
+		configSetCalls.length = 0
+
+		expect(
+			await handler.setupVlcConfig({ httpPort: 9080, httpPassword: "secret", httpEnabled: true }),
+		).toBe("process-unknown")
+		expect(configSetCalls).toHaveLength(0)
+	})
+
+	it("writes vlcrc once VLC is closed", async () => {
+		const handler = await handlerFor("vlcrc-defaults")
+		configSetCalls.length = 0
+
+		expect(
+			await handler.setupVlcConfig({ httpPort: 9080, httpPassword: "secret", httpEnabled: true }),
+		).toBe("saved")
+		expect(readFileSync(join(root, "vlc", "vlcrc"), "utf-8")).toContain("extraintf=http")
+		expect(configSetCalls).toHaveLength(1)
 	})
 })

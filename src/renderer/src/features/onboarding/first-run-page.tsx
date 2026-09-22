@@ -37,14 +37,20 @@ export function FirstRunPage(): JSX.Element {
 				httpEnabled: true,
 			})
 
-			if (updatedConfig) {
-				setVlcConfig(updatedConfig)
+			if (updatedConfig.kind === "saved") {
+				setVlcConfig(updatedConfig.config)
 				setConnectionStatus("success")
 				setErrorMessage(null)
 				setCurrentStep("done")
 			} else {
 				setConnectionStatus("error")
-				setErrorMessage("Could not configure VLC. Check that VLC is installed and closed.")
+				setErrorMessage(
+					updatedConfig.kind === "vlc-running"
+						? "VLC is open. Close it, then select Try again. Open VLC after setup."
+						: updatedConfig.kind === "process-unknown"
+							? "Could not check whether VLC is open. Check that it is closed, then try again."
+							: "Could not configure VLC. Check that VLC is installed and try again.",
+				)
 			}
 		} catch (error) {
 			logger.error(`Error during VLC configuration: ${error}`)

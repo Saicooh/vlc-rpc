@@ -109,11 +109,12 @@ your user profile.
 VLC's HTTP interface is off by default, so the app walks you through turning it on. It writes the
 port and a password into VLC's own configuration file, `vlcrc`.
 
-**VLC reads that file when it starts, so you have to restart VLC once after the setup.** The app
-cannot do that part for you.
+**Close VLC before setup, then open it again afterward.** The app checks whether VLC is running
+before it changes `vlcrc`, because VLC can overwrite those changes when it closes. If VLC is open,
+setup asks you to close it and try again.
 
 The default port is 9080. If something else on your machine is already using it, change it in
-Settings and restart VLC again. The password is generated if you leave it empty, and it is only
+Settings while VLC is closed, then open VLC again. The password is generated if you leave it empty, and it is only
 ever used to talk to VLC on your own machine.
 
 ## Using it
@@ -200,8 +201,8 @@ the whole album at once. Audio with no tags has nothing to be filed against exce
 so that correction ends the day the file is moved or renamed. Settings spells out what each one
 applies to, so you can see why one stopped working instead of guessing.
 
-**VLC has to be restarted after the initial setup,** and again after any change to the port or the
-password, because VLC only reads `vlcrc` at startup.
+**VLC has to be closed before the initial setup** and before changes to the port or password. Open
+it afterward, because VLC only reads `vlcrc` at startup.
 
 **Identification is confidence based and prefers silence.** If nothing scores well enough you get
 the filename and no cover, rather than a confident guess at the wrong show. Replacing the text

@@ -7,7 +7,9 @@ import { logger } from "@renderer/lib/utils"
 import type { VlcConfig } from "@shared/config/app-config"
 import { useState } from "react"
 
-type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "failed" }
+type SaveState = {
+	kind: "idle" | "saving" | "saved" | "failed" | "vlc-running" | "process-unknown"
+}
 
 interface VlcConfigFormProps {
 	initialConfig: VlcConfig
@@ -31,7 +33,7 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 			}
 
 			const saved = await saveVlcConfig(vlcConfig)
-			setSave(saved ? { kind: "saved" } : { kind: "failed" })
+			setSave({ kind: saved.kind })
 		} catch (error) {
 			logger.error(`Failed to update the VLC configuration: ${error}`)
 			setSave({ kind: "failed" })
@@ -101,12 +103,22 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 				<div className="flex items-center justify-end gap-4 px-4 py-3">
 					{save.kind === "saved" && (
 						<p className="type-caption text-pretty text-muted-foreground">
-							Saved to VLC's settings file. Restart VLC to apply it.
+							Saved to VLC's settings file. Open VLC to apply it.
 						</p>
 					)}
 					{save.kind === "failed" && (
 						<p role="alert" className="type-caption text-pretty text-danger-text">
-							Could not write VLC's settings file. Close VLC and try again.
+							Could not write VLC's settings file. Try again.
+						</p>
+					)}
+					{save.kind === "vlc-running" && (
+						<p role="alert" className="type-caption text-pretty text-danger-text">
+							VLC is open. Close it, then save again. Open VLC after saving.
+						</p>
+					)}
+					{save.kind === "process-unknown" && (
+						<p role="alert" className="type-caption text-pretty text-danger-text">
+							Could not check whether VLC is open. Check that it is closed, then save again.
 						</p>
 					)}
 					<Button type="submit" isLoading={save.kind === "saving"}>
