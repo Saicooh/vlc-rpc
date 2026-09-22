@@ -25,8 +25,9 @@ presence pipeline:
   to show that playback is shared.
 - **Better VLC metadata handling.** Keeps VLC's real filename separate from its display title, which
   makes catalog parsing reliable even when VLC reports a shortened or cleaned title.
-- **Episode names in Discord.** When the file name or VLC tags include an episode title, the
-  presence shows it beside the season and episode number. Number-only files keep the number.
+- **Episode names in Discord.** The presence shows the episode title beside its number when the
+  file name or VLC tags provide it. Otherwise it looks up a matching episode in TVMaze or AniList
+  when available. If it cannot find a reliable match, it keeps the number.
 
 The upstream project is [VLC Discord RP](https://github.com/valentin-marquez/vlc-rpc). This fork is
 published at [Saicooh/vlc-rpc](https://github.com/Saicooh/vlc-rpc).
@@ -95,8 +96,8 @@ about that.
 - In Discord, under Settings, Activity Privacy, "Display current activity as a status message"
   must be on.
 
-An internet connection is only needed for cover art lookups and for updates. Everything else is
-local.
+An internet connection is needed for cover art and episode title lookups, and for updates. Playback
+information from VLC remains local.
 
 ## Installing
 

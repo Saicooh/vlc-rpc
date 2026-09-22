@@ -127,6 +127,48 @@ function fakePresence(data: DiscordPresenceData | null = PRESENCE) {
 }
 
 describe("DiscordRpcHandler update loop", () => {
+	it("rechecks a missing episode title during playback and sends it when found", async () => {
+		vi.useFakeTimers()
+		const clock = new FakeClock()
+		const discord = fakeDiscord()
+		let episodeTitle: string | null = null
+		const presence = {
+			getDiscordPresence: async () => ({
+				details: "Some Show",
+				state: episodeTitle ? `S1E3 · ${episodeTitle}` : "S1E3",
+			}),
+		} as unknown as PresenceService
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() =>
+				status({
+					mediaType: "video",
+					media: { filename: "Some.Show.S01E03.mkv", title: "Some Show" },
+					playback: { position: 0.1, time: 10 + clock.now() / 1000, duration: 2000, rate: 1 },
+				}),
+			),
+			presence,
+			clock,
+		)
+
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(1)
+
+		clock.advance(5 * 60_000)
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(1)
+
+		clock.advance(5 * 60_000)
+		episodeTitle = "The Long Night"
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(2)
+		expect(handler.getLastPresence()).toMatchObject({
+			kind: "sent",
+			presence: { state: "S1E3 · The Long Night" },
+		})
+	})
+
 	it("retries a missing cover during the same playback and sends it when found", async () => {
 		vi.useFakeTimers()
 		const clock = new FakeClock()

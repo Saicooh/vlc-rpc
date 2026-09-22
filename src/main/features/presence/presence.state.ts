@@ -7,6 +7,7 @@ import type {
 	ParsedVideo,
 } from "@main/features/catalog"
 import { parse as parseVideo } from "@main/features/catalog"
+import type { EpisodeTitleLookup } from "@main/features/catalog/catalog.episode"
 import type { CorrectedTags } from "@main/features/overrides"
 import type { AppConfig } from "@shared/config/app-config"
 import type { ResolvedLayout, VideoFacts } from "@shared/presence/layout"
@@ -88,6 +89,7 @@ function videoFacts(
 	localParse: ParsedVideo | null,
 	canonicalTitle: string | null,
 	disc: VlcStatus["disc"],
+	externalEpisodeTitle: string | null,
 ): VideoFacts {
 	const isTvShow = catalogResult
 		? catalogResult.mediaKind === "tv"
@@ -105,7 +107,11 @@ function videoFacts(
 			localParse?.title,
 			media.title,
 		) ?? ""
-	const subtitle = firstNonEmpty(media.episodeTitle, localParse?.subtitle)
+	const subtitle = firstNonEmpty(
+		media.episodeTitle,
+		localParse?.subtitle,
+		externalEpisodeTitle ?? undefined,
+	)
 	const distinctSubtitle =
 		subtitle && !title.toLocaleLowerCase().includes(subtitle.toLocaleLowerCase())
 			? subtitle
@@ -143,12 +149,20 @@ function buildLines(
 	localParse: ParsedVideo | null,
 	corrected: CorrectedTags | null,
 	canonicalTitle: string | null,
+	externalEpisodeTitle: string | null,
 ): PresenceLines {
 	const media = mediaInfo.media
 
 	if (mediaInfo.mediaType === "video") {
 		const variables = videoVariables(
-			videoFacts(media, catalogResult, localParse, canonicalTitle, mediaInfo.disc),
+			videoFacts(
+				media,
+				catalogResult,
+				localParse,
+				canonicalTitle,
+				mediaInfo.disc,
+				externalEpisodeTitle,
+			),
 		)
 		return {
 			details: renderLine(layout.video.details, variables),
@@ -261,6 +275,7 @@ class PlayingState extends MediaState {
 		private readonly videoArtwork: VideoArtwork,
 		private readonly syncplay: SyncplayStatus,
 		private readonly localVideoArtwork: LocalVideoArtwork,
+		private readonly episodeTitles: EpisodeTitleLookup,
 	) {
 		super()
 	}
@@ -297,6 +312,8 @@ class PlayingState extends MediaState {
 		const videoCover =
 			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
 		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
+		const externalEpisodeTitle =
+			mediaType === "video" ? await this.episodeTitles.resolve(mediaInfo, catalogResult) : null
 
 		// The artwork first, and the text after it. Both can come from the same
 		// acoustic match, and the lookup that learns it happens inside this call:
@@ -313,6 +330,7 @@ class PlayingState extends MediaState {
 			localParse,
 			corrected,
 			videoCover?.canonicalTitle ?? null,
+			externalEpisodeTitle,
 		)
 
 		const details = this.formatText(lines.details)
@@ -385,6 +403,7 @@ class PausedState extends MediaState {
 		private readonly videoArtwork: VideoArtwork,
 		private readonly syncplay: SyncplayStatus,
 		private readonly localVideoArtwork: LocalVideoArtwork,
+		private readonly episodeTitles: EpisodeTitleLookup,
 	) {
 		super()
 	}
@@ -421,6 +440,8 @@ class PausedState extends MediaState {
 		const videoCover =
 			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
 		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
+		const externalEpisodeTitle =
+			mediaType === "video" ? await this.episodeTitles.resolve(mediaInfo, catalogResult) : null
 
 		// The artwork first, and the text after it. Both can come from the same
 		// acoustic match, and the lookup that learns it happens inside this call:
@@ -437,6 +458,7 @@ class PausedState extends MediaState {
 			localParse,
 			corrected,
 			videoCover?.canonicalTitle ?? null,
+			externalEpisodeTitle,
 		)
 
 		const details = this.formatText(lines.details)
@@ -512,6 +534,7 @@ export class Service {
 		videoArtwork: VideoArtwork = NO_VIDEO_ARTWORK,
 		syncplay: SyncplayStatus = NO_SYNCPLAY,
 		localVideoArtwork: LocalVideoArtwork = NO_LOCAL_VIDEO_ARTWORK,
+		episodeTitles: EpisodeTitleLookup = { resolve: async () => null },
 	) {
 		this.states = {
 			stopped: new StoppedState(),
@@ -523,6 +546,7 @@ export class Service {
 				videoArtwork,
 				syncplay,
 				localVideoArtwork,
+				episodeTitles,
 			),
 			paused: new PausedState(
 				artwork,
@@ -531,6 +555,7 @@ export class Service {
 				videoArtwork,
 				syncplay,
 				localVideoArtwork,
+				episodeTitles,
 			),
 		}
 

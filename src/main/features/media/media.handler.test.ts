@@ -147,6 +147,9 @@ function buildVideo(
 	target: OverrideTarget | null = null,
 	proxied: string | null = null,
 	localCover?: CoverOutcome,
+	episodeTitles?: {
+		resolve: (status: VlcStatus, result: CatalogResult | null) => Promise<string | null>
+	},
 ): MediaInfoHandler {
 	const refuse = (): never => {
 		throw new Error("the audio path must not be consulted for video")
@@ -176,6 +179,7 @@ function buildVideo(
 		vlc,
 		imageProxy,
 		localCover ? { fetch: async () => localCover } : undefined,
+		episodeTitles,
 	)
 }
 
@@ -255,6 +259,15 @@ describe("MediaInfoHandler video content fields", () => {
 			episode: 3,
 			episode_title: "The Long Night",
 		})
+	})
+
+	it("reports a verified external title to the live layout preview", async () => {
+		const handler = buildVideo(null, null, null, undefined, {
+			resolve: async () => "The Long Night",
+		})
+		const info = await handler.getMediaInfo(videoStatus("Some.Show.S01E03.mkv"))
+
+		expect(info?.content_metadata?.episode_title).toBe("The Long Night")
 	})
 
 	it("prefers VLC episode tags over a filename that only has an episode number", async () => {

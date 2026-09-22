@@ -6,6 +6,7 @@ import type {
 	CatalogResult,
 	ParsedVideo,
 } from "@main/features/catalog"
+import type { EpisodeTitleLookup } from "@main/features/catalog/catalog.episode"
 import { parse as parseVideo } from "@main/features/catalog/catalog.parser"
 import type { CoverOutcome } from "@main/features/cover"
 import type { CorrectedTags, OverrideTarget } from "@main/features/overrides"
@@ -125,6 +126,7 @@ export class MediaInfoHandler {
 		private readonly vlc: VlcClient,
 		private readonly imageProxy: ImageProxy,
 		private readonly localVideoArtwork?: { fetch(status: VlcStatus): Promise<CoverOutcome> },
+		private readonly episodeTitles?: EpisodeTitleLookup,
 	) {
 		this.registerHandlers()
 	}
@@ -205,6 +207,12 @@ export class MediaInfoHandler {
 					if (metadata) {
 						mediaInfo.content_type = "tv_show"
 						mediaInfo.content_metadata = metadata
+					}
+				}
+				if (mediaInfo.content_metadata && !mediaInfo.content_metadata.episode_title) {
+					const externalEpisodeTitle = await this.episodeTitles?.resolve(vlcStatus, catalogResult)
+					if (externalEpisodeTitle) {
+						mediaInfo.content_metadata.episode_title = externalEpisodeTitle
 					}
 				}
 

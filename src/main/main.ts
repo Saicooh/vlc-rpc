@@ -86,6 +86,7 @@ if (!gotTheLock) {
 		const catalogCache = new Catalog.Cache(systemClock)
 		const anilist = new Catalog.AniListProvider()
 		const catalogResolver = new Catalog.Resolver(catalogCache, anilist, overridesStore)
+		const episodeTitles = new Catalog.EpisodeTitleResolver()
 		const videoCover = new Cover.VideoResolver(anilist)
 		const musicCache = new Music.Cache(systemClock)
 		// Identifying audio by its sound needs a key of this application's own,
@@ -130,6 +131,7 @@ if (!gotTheLock) {
 			videoCover,
 			new Presence.SyncplayDetector(),
 			cover,
+			episodeTitles,
 		)
 
 		// The tray/window cycle, resolved in fixed order
@@ -140,7 +142,15 @@ if (!gotTheLock) {
 		// Handlers, one per feature
 		new App.AppInfoHandler(startup)
 		new Cover.MetadataHandler(coverStore)
-		new Media.MediaInfoHandler(artwork, catalogResolver, musicResolver, vlc, imageProxy, cover)
+		new Media.MediaInfoHandler(
+			artwork,
+			catalogResolver,
+			musicResolver,
+			vlc,
+			imageProxy,
+			cover,
+			episodeTitles,
+		)
 		const discordRpcHandler = new Discord.DiscordRpcHandler(discord, vlc, presence, systemClock)
 		// Both resolvers, because the key alone does not say which cache holds what
 		// the correction replaces. The rpc handler, because evicting a cache does

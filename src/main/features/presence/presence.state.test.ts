@@ -327,6 +327,9 @@ function videoService(
 	},
 	syncplay?: { isRunning: () => Promise<boolean> },
 	localVideoArtwork?: { fetch: (status: VlcStatus) => Promise<CoverOutcome> },
+	episodeTitles?: {
+		resolve: (status: VlcStatus, result: CatalogResult | null) => Promise<string | null>
+	},
 ): Service {
 	const artwork = new ArtworkResolver(
 		{
@@ -354,6 +357,7 @@ function videoService(
 		videoArtwork,
 		syncplay,
 		localVideoArtwork,
+		episodeTitles,
 	)
 }
 
@@ -388,6 +392,15 @@ describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 
 			expect(presence?.details).toBe("Breaking Bad")
 			expect(presence?.state).toBe("S2E5")
+		})
+
+		it("shows a verified external episode title when the file has only a number", async () => {
+			const presence = await videoService(SERIES, undefined, undefined, undefined, {
+				resolve: async () => "The Long Night",
+			}).getDiscordPresence(videoStatus("Breaking.Bad.S02E05.mkv", state), timeline)
+
+			expect(presence?.details).toBe("Breaking Bad")
+			expect(presence?.state).toBe("S2E5 · The Long Night")
 		})
 
 		it("shows a filename's episode title beside its number", async () => {

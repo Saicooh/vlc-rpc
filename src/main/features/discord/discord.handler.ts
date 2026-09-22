@@ -3,13 +3,25 @@ import type { Clock } from "@main/core/clock"
 import { configService } from "@main/core/config"
 import { registerHandler } from "@main/core/ipc"
 import { logger } from "@main/core/logger"
+import { parse as parseVideo } from "@main/features/catalog/catalog.parser"
 import { Timeline, presenceKey } from "@main/features/presence"
 import type { Service as PresenceService } from "@main/features/presence"
 import type { Client as VlcClient } from "@main/features/vlc"
 import type { LastSentPresence, PresenceClearReason } from "@shared/presence/presence.types"
+import type { VlcStatus } from "@shared/vlc/vlc.types"
 import type { Client as DiscordClient } from "./discord.client"
 
 const ARTWORK_RETRY_MS = 30_000
+const EPISODE_RETRY_MS = 5 * 60_000
+
+function needsEpisodeRetry(status: VlcStatus): boolean {
+	if (status.mediaType !== "video" || status.media.episodeTitle) return false
+	const parsed = parseVideo(
+		status.media.filename || status.media.title || "",
+		status.playback.duration,
+	)
+	return (status.media.episode ?? parsed.episode) !== undefined && !parsed.subtitle
+}
 
 export class DiscordRpcHandler {
 	private pollIntervalId: NodeJS.Timeout | null = null
@@ -18,6 +30,7 @@ export class DiscordRpcHandler {
 	private wasConnected = false
 	private presenceCleared = false
 	private nextArtworkRetryAt = 0
+	private nextEpisodeRetryAt = 0
 	private lastPresence: LastSentPresence = { kind: "unknown" }
 
 	constructor(
@@ -126,6 +139,7 @@ export class DiscordRpcHandler {
 		this.wasConnected = false
 		this.presenceCleared = false
 		this.nextArtworkRetryAt = 0
+		this.nextEpisodeRetryAt = 0
 		this.lastPresence = { kind: "cleared", reason: "loop-stopped" }
 
 		this.discord.clear().catch((error) => {
@@ -170,8 +184,10 @@ export class DiscordRpcHandler {
 				this.lastPresence.kind === "sent" &&
 				this.lastPresence.presence.large_image === configService.get("largeImage") &&
 				this.clock.now() >= this.nextArtworkRetryAt
+			const retryEpisode =
+				sameKey && this.nextEpisodeRetryAt > 0 && this.clock.now() >= this.nextEpisodeRetryAt
 
-			if (!force && !justReconnected && sameKey && !retryArtwork) {
+			if (!force && !justReconnected && sameKey && !retryArtwork && !retryEpisode) {
 				return true
 			}
 
@@ -180,13 +196,14 @@ export class DiscordRpcHandler {
 				return this.pushClear("playback-stopped")
 			}
 			if (
-				retryArtwork &&
+				(retryArtwork || retryEpisode) &&
 				!force &&
 				!justReconnected &&
 				this.lastPresence.kind === "sent" &&
 				isDeepStrictEqual(presenceData, this.lastPresence.presence)
 			) {
-				this.nextArtworkRetryAt = this.clock.now() + ARTWORK_RETRY_MS
+				if (retryArtwork) this.nextArtworkRetryAt = this.clock.now() + ARTWORK_RETRY_MS
+				if (retryEpisode) this.nextEpisodeRetryAt = this.clock.now() + EPISODE_RETRY_MS
 				return true
 			}
 
@@ -198,6 +215,9 @@ export class DiscordRpcHandler {
 					presenceData.large_image === configService.get("largeImage")
 						? this.clock.now() + ARTWORK_RETRY_MS
 						: 0
+				this.nextEpisodeRetryAt = needsEpisodeRetry(vlcStatus)
+					? this.clock.now() + EPISODE_RETRY_MS
+					: 0
 				// Recorded only once Discord accepted it, so a refused update never
 				// shows up as an activity nobody can see.
 				this.lastPresence = {
@@ -222,6 +242,7 @@ export class DiscordRpcHandler {
 	private async pushClear(reason: PresenceClearReason): Promise<boolean> {
 		this.lastSentKey = null
 		this.nextArtworkRetryAt = 0
+		this.nextEpisodeRetryAt = 0
 		this.lastPresence = { kind: "cleared", reason }
 
 		if (this.presenceCleared) {
