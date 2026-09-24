@@ -9,12 +9,18 @@ files:
   - "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}"
   - "!{.env,.env.*,.npmrc,pnpm-lock.yaml}"
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
-asarUnpack:
-  - resources/**
-  - "**/*.png"
+  - "!resources/**"
+  - "!docs/**"
+  - "!scripts/**"
+  - "!.atl/**"
+  - "!.changeset/**"
+  - "!.tsbuildinfo-*"
+  - "!{bun.lock,CONTRIBUTING.md,biome.json,vitest.config.ts}"
 extraResources:
   - from: "resources"
     to: "resources"
+    filter:
+      - "bin/**"
 win:
   executableName: VLC Discord RP
   target:

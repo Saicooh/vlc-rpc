@@ -24,10 +24,9 @@ export interface FpcalcLocation {
 
 /**
  * Where the binary is, which differs between the two ways this app runs.
- * Packaged, electron-builder copies `resources` beside the app through
- * extraResources and asarUnpack keeps it a real file rather than an archive
- * entry, which is what makes it executable. In development it sits where
- * scripts/fetch-fpcalc.mjs puts it, inside the repository.
+ * Packaged, electron-builder copies the binary beside the app through
+ * extraResources, keeping it outside the asar archive and executable. In
+ * development it sits where scripts/fetch-fpcalc.mjs puts it, inside the repository.
  */
 export function fpcalcPath(location: FpcalcLocation): string {
 	const root = location.packaged
