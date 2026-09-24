@@ -1,5 +1,6 @@
 import { NowPlaying } from "@renderer/features/media/components/now-playing"
 import { SourcePanel } from "@renderer/features/media/components/source-panel"
+import { useT } from "@renderer/i18n"
 
 /**
  * Two blocks: what Discord shows, then what VLC reports. Connection state is not
@@ -7,9 +8,10 @@ import { SourcePanel } from "@renderer/features/media/components/source-panel"
  * what is wrong and offer the fix without a banner shoving the page down.
  */
 export function HomePage(): JSX.Element {
+	const t = useT()
 	return (
 		<div className="flex flex-col gap-6">
-			<h1 className="sr-only">Home</h1>
+			<h1 className="sr-only">{t("Home")}</h1>
 
 			<NowPlaying />
 			<SourcePanel />

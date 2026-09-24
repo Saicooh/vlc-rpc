@@ -25,7 +25,11 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
 	)
 }
 
-function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+function TabsTrigger({
+	className,
+	children,
+	...props
+}: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
 	return (
 		<TabsPrimitive.Trigger
 			data-slot="tabs-trigger"
@@ -42,7 +46,9 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{children}
+		</TabsPrimitive.Trigger>
 	)
 }
 

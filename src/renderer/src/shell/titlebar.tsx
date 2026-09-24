@@ -1,3 +1,4 @@
+import { useT } from "@renderer/i18n"
 import { cn } from "@renderer/lib/utils"
 import { Navigation } from "@renderer/shell/navigation"
 import { StatusChips } from "@renderer/shell/status-chip"
@@ -17,6 +18,7 @@ interface TitlebarProps {
 }
 
 export function Titlebar({ isMac, scrolled }: TitlebarProps): JSX.Element {
+	const t = useT()
 	const [isMaximized, setIsMaximized] = useState(false)
 
 	useEffect(() => {
@@ -71,7 +73,7 @@ export function Titlebar({ isMac, scrolled }: TitlebarProps): JSX.Element {
 							type="button"
 							onClick={handleMinimize}
 							className={cn(windowControl, "hover:bg-float hover:text-strong")}
-							aria-label="Minimize"
+							aria-label={t("Minimize")}
 						>
 							<Minus className="size-4" />
 						</button>
@@ -79,7 +81,7 @@ export function Titlebar({ isMac, scrolled }: TitlebarProps): JSX.Element {
 							type="button"
 							onClick={handleMaximize}
 							className={cn(windowControl, "hover:bg-float hover:text-strong")}
-							aria-label={isMaximized ? "Restore" : "Maximize"}
+							aria-label={t(isMaximized ? "Restore" : "Maximize")}
 						>
 							{isMaximized ? (
 								<span className="size-3 border border-current" />
@@ -91,7 +93,7 @@ export function Titlebar({ isMac, scrolled }: TitlebarProps): JSX.Element {
 							type="button"
 							onClick={handleClose}
 							className={cn(windowControl, "hover:bg-danger hover:text-white")}
-							aria-label="Close"
+							aria-label={t("Close")}
 						>
 							<X className="size-4" />
 						</button>

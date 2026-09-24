@@ -1,4 +1,5 @@
 import logo from "@renderer/assets/logo.png"
+import { useT } from "@renderer/i18n"
 import { cn } from "@renderer/lib/utils"
 import { Gear, House, type Icon, Layout as LayoutIcon } from "phosphor-react"
 import { Link } from "wouter"
@@ -17,13 +18,17 @@ const NAV_ITEMS: readonly NavItem[] = [
 ]
 
 export function Navigation(): JSX.Element {
+	const t = useT()
 	const [location] = useHashLocation()
 
 	return (
 		<div className="flex items-center gap-3">
 			<img src={logo} alt="" className="size-6 shrink-0" />
 
-			<nav aria-label="Main" className="no-drag flex items-center gap-1 rounded-md bg-inset p-1">
+			<nav
+				aria-label={t("Main")}
+				className="no-drag flex items-center gap-1 rounded-md bg-inset p-1"
+			>
 				{NAV_ITEMS.map((item) => (
 					<NavTab key={item.path} item={item} active={location === item.path} />
 				))}
@@ -33,6 +38,7 @@ export function Navigation(): JSX.Element {
 }
 
 function NavTab({ item, active }: { item: NavItem; active: boolean }): JSX.Element {
+	const t = useT()
 	const Glyph = item.icon
 
 	return (
@@ -49,7 +55,7 @@ function NavTab({ item, active }: { item: NavItem; active: boolean }): JSX.Eleme
 			)}
 		>
 			<Glyph size={16} weight={active ? "fill" : "regular"} />
-			{item.label}
+			{t(item.label)}
 		</Link>
 	)
 }

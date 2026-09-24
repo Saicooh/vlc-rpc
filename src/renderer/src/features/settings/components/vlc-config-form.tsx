@@ -3,6 +3,7 @@ import { Input } from "@renderer/components/ui/input"
 import { Panel, Row } from "@renderer/components/ui/panel"
 import { Switch } from "@renderer/components/ui/switch"
 import { saveVlcConfig } from "@renderer/features/vlc"
+import { useT } from "@renderer/i18n"
 import { logger } from "@renderer/lib/utils"
 import type { VlcConfig } from "@shared/config/app-config"
 import { useState } from "react"
@@ -16,6 +17,7 @@ interface VlcConfigFormProps {
 }
 
 export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Element {
+	const t = useT()
 	const [save, setSave] = useState<SaveState>({ kind: "idle" })
 	const [showPassword, setShowPassword] = useState(false)
 
@@ -45,8 +47,8 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 			<Panel label="VLC">
 				<Row
 					htmlFor="httpPort"
-					label="Port"
-					description="VLC listens on this port. 9080 unless you changed it."
+					label={t("Port")}
+					description={t("VLC listens on this port. 9080 unless you changed it.")}
 					control={
 						<Input
 							id="httpPort"
@@ -62,8 +64,8 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 
 				<Row
 					htmlFor="httpPassword"
-					label="Password"
-					description="The app sends this to read VLC. Leave it empty to have one generated."
+					label={t("Password")}
+					description={t("The app sends this to read VLC. Leave it empty to have one generated.")}
 					control={
 						<div className="relative w-56">
 							<Input
@@ -71,7 +73,7 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 								name="httpPassword"
 								type={showPassword ? "text" : "password"}
 								defaultValue={initialConfig.httpPassword}
-								placeholder="Not set"
+								placeholder={t("Not set")}
 								className="pe-10"
 							/>
 							<Button
@@ -79,7 +81,7 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 								size="icon"
 								className="absolute end-1 top-1"
 								onClick={() => setShowPassword(!showPassword)}
-								aria-label={showPassword ? "Hide the password" : "Show the password"}
+								aria-label={t(showPassword ? "Hide the password" : "Show the password")}
 							>
 								{showPassword ? <EyeOffGlyph /> : <EyeGlyph />}
 							</Button>
@@ -89,8 +91,8 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 
 				<Row
 					htmlFor="httpEnabled"
-					label="Let this app read VLC over HTTP"
-					description="Discord Rich Presence needs this on."
+					label={t("Let this app read VLC over HTTP")}
+					description={t("Discord Rich Presence needs this on.")}
 					control={
 						<Switch
 							id="httpEnabled"
@@ -103,26 +105,26 @@ export function VlcConfigForm({ initialConfig }: VlcConfigFormProps): JSX.Elemen
 				<div className="flex items-center justify-end gap-4 px-4 py-3">
 					{save.kind === "saved" && (
 						<p className="type-caption text-pretty text-muted-foreground">
-							Saved to VLC's settings file. Open VLC to apply it.
+							{t("Saved to VLC's settings file. Open VLC to apply it.")}
 						</p>
 					)}
 					{save.kind === "failed" && (
 						<p role="alert" className="type-caption text-pretty text-danger-text">
-							Could not write VLC's settings file. Try again.
+							{t("Could not write VLC's settings file. Try again.")}
 						</p>
 					)}
 					{save.kind === "vlc-running" && (
 						<p role="alert" className="type-caption text-pretty text-danger-text">
-							VLC is open. Close it, then save again. Open VLC after saving.
+							{t("VLC is open. Close it, then save again. Open VLC after saving.")}
 						</p>
 					)}
 					{save.kind === "process-unknown" && (
 						<p role="alert" className="type-caption text-pretty text-danger-text">
-							Could not check whether VLC is open. Check that it is closed, then save again.
+							{t("Could not check whether VLC is open. Check that it is closed, then save again.")}
 						</p>
 					)}
 					<Button type="submit" isLoading={save.kind === "saving"}>
-						Save
+						{t("Save")}
 					</Button>
 				</div>
 			</Panel>

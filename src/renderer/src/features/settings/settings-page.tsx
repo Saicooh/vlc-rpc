@@ -1,4 +1,5 @@
 import { useStore } from "@nanostores/react"
+import { useT } from "@renderer/i18n"
 import { configStore } from "@renderer/stores/config.store"
 import { useEffect, useState } from "react"
 import { AboutPanel } from "./components/about-panel"
@@ -9,6 +10,7 @@ import { VlcConfigForm } from "./components/vlc-config-form"
 import { type SystemInfo, readSystemInfo } from "./system-info"
 
 export function SettingsPage(): JSX.Element {
+	const t = useT()
 	const config = useStore(configStore)
 	const [system, setSystem] = useState<SystemInfo>({ kind: "loading" })
 
@@ -27,12 +29,12 @@ export function SettingsPage(): JSX.Element {
 	}, [])
 
 	if (!config) {
-		return <p className="type-body text-muted-foreground">Loading your settings</p>
+		return <p className="type-body text-muted-foreground">{t("Loading your settings")}</p>
 	}
 
 	return (
 		<div className="flex flex-col gap-8">
-			<h1 className="sr-only">Settings</h1>
+			<h1 className="sr-only">{t("Settings")}</h1>
 			<AppSettingsPanel
 				config={config}
 				canStartWithSystem={system.kind === "ready" && system.installedAs === "setup"}

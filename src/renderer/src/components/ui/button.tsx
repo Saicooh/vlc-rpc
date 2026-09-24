@@ -46,34 +46,36 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 			...props
 		},
 		ref,
-	) => (
-		<button
-			ref={ref}
-			type={type}
-			className={cn(
-				"button relative inline-flex cursor-pointer select-none items-center justify-center",
-				"type-label whitespace-nowrap [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-				"focus-discord disabled:pointer-events-none disabled:opacity-60",
-				MOTION,
-				PRESS,
-				SIZES[size],
-				VARIANTS[variant],
-				className,
-			)}
-			disabled={isLoading || disabled}
-			aria-busy={isLoading}
-			{...props}
-		>
-			{isLoading && (
-				<span className="absolute inset-0 grid place-items-center">
-					<Spinner />
+	) => {
+		return (
+			<button
+				ref={ref}
+				type={type}
+				className={cn(
+					"button relative inline-flex cursor-pointer select-none items-center justify-center",
+					"type-label whitespace-nowrap [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+					"focus-discord disabled:pointer-events-none disabled:opacity-60",
+					MOTION,
+					PRESS,
+					SIZES[size],
+					VARIANTS[variant],
+					className,
+				)}
+				disabled={isLoading || disabled}
+				aria-busy={isLoading}
+				{...props}
+			>
+				{isLoading && (
+					<span className="absolute inset-0 grid place-items-center">
+						<Spinner />
+					</span>
+				)}
+				<span className={cn("inline-flex items-center gap-2", isLoading && "opacity-0")}>
+					{children}
 				</span>
-			)}
-			<span className={cn("inline-flex items-center gap-2", isLoading && "opacity-0")}>
-				{children}
-			</span>
-		</button>
-	),
+			</button>
+		)
+	},
 )
 
 Button.displayName = "Button"

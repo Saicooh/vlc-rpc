@@ -1,5 +1,6 @@
 import logo from "@renderer/assets/logo.png"
 import { loadVlcConfig, saveVlcConfig } from "@renderer/features/vlc"
+import { useT } from "@renderer/i18n"
 import { cn, logger } from "@renderer/lib/utils"
 import { saveFullConfig } from "@renderer/stores/config.store"
 import type { VlcConfig } from "@shared/config/app-config"
@@ -139,9 +140,12 @@ interface StepIndicatorProps {
 
 // The line sits on the card's top edge so the indicator costs the layout no height.
 function StepIndicator({ steps, currentIndex }: StepIndicatorProps): JSX.Element {
+	const t = useT()
 	return (
 		<>
-			<p className="sr-only">{`Step ${currentIndex + 1} of ${steps.length}`}</p>
+			<p className="sr-only">
+				{t("Step {current} of {total}", { current: currentIndex + 1, total: steps.length })}
+			</p>
 			<div aria-hidden="true" className="absolute inset-x-0 top-0 flex h-[2px] gap-1">
 				{steps.map((step, index) => (
 					<span

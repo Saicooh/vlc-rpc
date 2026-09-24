@@ -1,5 +1,6 @@
 import { Button } from "@renderer/components/ui/button"
 import { Panel, Row } from "@renderer/components/ui/panel"
+import { useT } from "@renderer/i18n"
 import { logger } from "@renderer/lib/utils"
 import type { UpdateCheckResult } from "@shared/updates/update.types"
 import { useState } from "react"
@@ -43,6 +44,7 @@ function sentenceFor(state: CheckState): string {
 }
 
 export function AboutPanel({ info }: AboutPanelProps): JSX.Element {
+	const t = useT()
 	const [check, setCheck] = useState<CheckState>({ kind: "resting" })
 
 	let version = "Not available"
@@ -68,13 +70,21 @@ export function AboutPanel({ info }: AboutPanelProps): JSX.Element {
 	}
 
 	return (
-		<Panel label="About">
-			<Row kind="value" label="Version" value={version} />
-			<Row kind="value" label="Installed as" value={installedAs} />
+		<Panel label={t("About")}>
+			<Row kind="value" label={t("Version")} value={info.kind === "ready" ? version : t(version)} />
+			<Row kind="value" label={t("Installed as")} value={t(installedAs)} />
 			<Row
 				kind="setting"
-				label="Updates"
-				description={<span aria-live="polite">{sentenceFor(check)}</span>}
+				label={t("Updates")}
+				description={
+					<span aria-live="polite">
+						{check.kind === "answered" && check.result.kind === "found"
+							? t("Version {version} is waiting on the button in the title bar.", {
+									version: check.result.version,
+								})
+							: t(sentenceFor(check))}
+					</span>
+				}
 				control={
 					<Button
 						variant="secondary"
@@ -84,7 +94,7 @@ export function AboutPanel({ info }: AboutPanelProps): JSX.Element {
 							void ask()
 						}}
 					>
-						Check for updates
+						{t("Check for updates")}
 					</Button>
 				}
 			/>

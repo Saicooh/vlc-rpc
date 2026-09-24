@@ -1,5 +1,6 @@
 import { useStore } from "@nanostores/react"
 import { PresenceCard, type PresenceCardLiveProps } from "@renderer/components/presence-card"
+import { useT } from "@renderer/i18n"
 import { configStore } from "@renderer/stores/config.store"
 import type { PresenceClearReason } from "@shared/presence/presence.types"
 
@@ -23,6 +24,7 @@ const CLEARED_BECAUSE: Record<PresenceClearReason, string> = {
  * does not jump when the activity clears.
  */
 export function NowPlaying(): JSX.Element {
+	const t = useT()
 	const lastPresence = useLastPresence()
 	const config = useStore(configStore)
 	const artworkUrl = usePresenceArtwork(
@@ -31,7 +33,11 @@ export function NowPlaying(): JSX.Element {
 
 	if (lastPresence.kind === "unknown") {
 		return (
-			<PresenceCard kind="empty" header="No activity yet" message="Waiting for the first update" />
+			<PresenceCard
+				kind="empty"
+				header={t("No activity yet")}
+				message={t("Waiting for the first update")}
+			/>
 		)
 	}
 
@@ -39,8 +45,8 @@ export function NowPlaying(): JSX.Element {
 		return (
 			<PresenceCard
 				kind="empty"
-				header="No activity"
-				message={CLEARED_BECAUSE[lastPresence.reason]}
+				header={t("No activity")}
+				message={t(CLEARED_BECAUSE[lastPresence.reason])}
 			/>
 		)
 	}

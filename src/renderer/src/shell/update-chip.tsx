@@ -1,4 +1,5 @@
 import { useUpdateOffer } from "@renderer/features/updates"
+import { useT } from "@renderer/i18n"
 import { cn } from "@renderer/lib/utils"
 import { ArrowClockwise } from "phosphor-react"
 import { useEffect, useId, useRef, useState } from "react"
@@ -41,6 +42,7 @@ const PILL = cn(
  * reader, which is why it is hidden from one.
  */
 export function UpdateChip(): JSX.Element {
+	const t = useT()
 	const { offer, accept } = useUpdateOffer()
 	const descriptionId = useId()
 	const wrapper = useRef<HTMLDivElement>(null)
@@ -48,6 +50,8 @@ export function UpdateChip(): JSX.Element {
 	const leaveTimer = useRef<number | null>(null)
 	const [isOpen, setOpen] = useState(false)
 	const actionable = offer.kind === "install" || offer.kind === "release-page"
+	const label = offer.kind === "none" ? "" : t(offer.labelKey, { version: offer.version })
+	const detail = offer.kind === "none" ? "" : t(offer.detailKey, { version: offer.version })
 
 	useEffect(() => cancelHover, [])
 
@@ -74,7 +78,7 @@ export function UpdateChip(): JSX.Element {
 			    an empty header keeps its spacing exactly as it was. The download
 			    announces itself, so only the arrival is announced here. */}
 			<span className="sr-only" aria-live="polite">
-				{actionable ? offer.label : ""}
+				{actionable ? label : ""}
 			</span>
 
 			<div
@@ -104,7 +108,7 @@ export function UpdateChip(): JSX.Element {
 				{offer.kind === "working" && (
 					<output className={cn(PILL, "bg-brand-wash text-brand-text")}>
 						<ArrowClockwise className="size-3.5" aria-hidden="true" />
-						<span>{offer.label}</span>
+						<span>{label}</span>
 						{/* Text, not a bar: a reduced motion setting must not cost the number. */}
 						<span className="min-w-[3ch] text-end tabular-nums">{offer.percent}%</span>
 					</output>
@@ -123,12 +127,12 @@ export function UpdateChip(): JSX.Element {
 							)}
 						>
 							<ArrowClockwise className="size-3.5" aria-hidden="true" />
-							<span>{offer.label}</span>
+							<span>{label}</span>
 						</button>
 
 						{/* What the panel says, for someone who will never hover it. */}
 						<span id={descriptionId} className="sr-only">
-							{offer.detail}
+							{detail}
 						</span>
 					</>
 				)}
@@ -136,8 +140,10 @@ export function UpdateChip(): JSX.Element {
 				{isOpen && offer.kind !== "none" && (
 					<div aria-hidden="true" className={PANEL_ANCHOR}>
 						<div className={PANEL}>
-							<p className="type-label text-strong">Version {offer.version}</p>
-							<p className="type-caption text-pretty text-muted-foreground">{offer.detail}</p>
+							<p className="type-label text-strong">
+								{t("Version {version}", { version: offer.version })}
+							</p>
+							<p className="type-caption text-pretty text-muted-foreground">{detail}</p>
 						</div>
 					</div>
 				)}

@@ -2,6 +2,7 @@ import { PresenceCard } from "@renderer/components/presence-card"
 import { Button } from "@renderer/components/ui/button"
 import type { ActivityVerb } from "@renderer/features/media"
 import { activityHeader, headerPrefix, usePresenceArtwork } from "@renderer/features/media"
+import { useT } from "@renderer/i18n"
 import { cn } from "@renderer/lib/utils"
 import type { LayoutPiece, PieceInfo } from "@shared/presence/layout"
 import { drawnValue, pieceLabel, renderLine, textPiece, valuePiece } from "@shared/presence/layout"
@@ -57,6 +58,7 @@ export function LayoutCanvas({
 	icon,
 	onReset,
 }: LayoutCanvasProps): JSX.Element {
+	const t = useT()
 	const id = useId()
 	const flip = useFlip()
 	const [target, setTarget] = useState(0)
@@ -67,11 +69,21 @@ export function LayoutCanvas({
 	const drag = usePieceDrag((state, dropped) => {
 		if (state.origin === null) {
 			draft.place(dropped, state.piece)
-			announce(`${state.label} added to the ${slotName(dropped.lineIndex)}.`)
+			announce(
+				t("{label} added to the {slot}.", {
+					label: t(state.label),
+					slot: slotName(dropped.lineIndex),
+				}),
+			)
 			return
 		}
 		draft.move(state.origin, dropped)
-		announce(`${state.label} moved to the ${slotName(dropped.lineIndex)}.`)
+		announce(
+			t("{label} moved to the {slot}.", {
+				label: t(state.label),
+				slot: slotName(dropped.lineIndex),
+			}),
+		)
 	})
 
 	useEffect(() => {
@@ -94,7 +106,7 @@ export function LayoutCanvas({
 	const canSave = draft.isDirty && report.stranded.length === 0
 
 	function slotName(index: number): string {
-		return slots[index]?.inSentence ?? "line"
+		return t(slots[index]?.inSentence ?? "line")
 	}
 
 	function announce(what: string): void {
@@ -107,7 +119,7 @@ export function LayoutCanvas({
 		if (drag.consumedClick()) return
 		const line = draft.lines[target]
 		draft.place({ lineIndex: target, index: line?.length ?? 0 }, piece)
-		announce(`${label} added to the ${slotName(target)}.`)
+		announce(t("{label} added to the {slot}.", { label: t(label), slot: slotName(target) }))
 	}
 
 	function requestRemove(lineIndex: number, pieceId: string, label: string): void {
@@ -121,7 +133,7 @@ export function LayoutCanvas({
 			},
 			window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : REMOVE_MS,
 		)
-		announce(`${label} taken off the ${slotName(lineIndex)}.`)
+		announce(t("{label} taken off the {slot}.", { label: t(label), slot: slotName(lineIndex) }))
 	}
 
 	function nudge(lineIndex: number, pieceId: string, step: number): void {
@@ -138,13 +150,13 @@ export function LayoutCanvas({
 		if (next < 0 || next >= slots.length) return
 		draft.move({ lineIndex, pieceId }, { lineIndex: next, index: draft.lines[next]?.length ?? 0 })
 		setTarget(next)
-		announce(`Moved to the ${slotName(next)}.`)
+		announce(t("Moved to the {slot}.", { slot: slotName(next) }))
 	}
 
 	return (
 		<div className="grid gap-6 @min-[640px]:grid-cols-[200px_minmax(0,1fr)]">
 			<fieldset className="flex min-w-0 flex-col gap-3">
-				<legend className="type-eyebrow mb-2 text-muted-foreground">Pieces</legend>
+				<legend className="type-eyebrow mb-2 text-muted-foreground">{t("Pieces")}</legend>
 
 				<div className="flex flex-wrap gap-2 @min-[640px]:flex-col @min-[640px]:items-start">
 					{pieces.map((piece) => (
@@ -161,7 +173,7 @@ export function LayoutCanvas({
 					))}
 					<PalettePiece
 						label="Your own words"
-						held="type anything"
+						held={t("type anything")}
 						isLifted={
 							drag.state?.origin === null &&
 							drag.state.label === "Your own words" &&
@@ -174,7 +186,7 @@ export function LayoutCanvas({
 
 				<div className="flex flex-col gap-2">
 					<span id={`${id}-target`} className="type-eyebrow text-muted-foreground">
-						Add to
+						{t("Add to")}
 					</span>
 					<div role="radiogroup" aria-labelledby={`${id}-target`} className="flex flex-col gap-1">
 						{slots.map((slot, index) => (
@@ -194,7 +206,7 @@ export function LayoutCanvas({
 									onChange={() => setTarget(index)}
 									className="sr-only"
 								/>
-								{slot.label}
+								{t(slot.label)}
 							</label>
 						))}
 					</div>
@@ -207,7 +219,7 @@ export function LayoutCanvas({
 					    the moment VLC reports one, which is the whole point of holding this card up
 					    beside the real Discord window. */}
 					{primary !== undefined && (
-						<span className="type-caption text-faint">{primary.label}</span>
+						<span className="type-caption text-faint">{t(primary.label)}</span>
 					)}
 					<div className="rounded-lg border border-divider bg-inset p-4">
 						<PresenceCard
@@ -223,7 +235,9 @@ export function LayoutCanvas({
 
 				{others.map((sample) => (
 					<div key={sample.id} className="flex flex-col gap-2">
-						<span className="type-caption text-faint">The same pieces for {sample.inSentence}</span>
+						<span className="type-caption text-faint">
+							{t("The same pieces for {sample}", { sample: t(sample.inSentence) })}
+						</span>
 						{/* No cover and no times: this file is not playing, and an example that
 						    drew either would be showing something nobody could check. */}
 						<PresenceCard
@@ -242,14 +256,17 @@ export function LayoutCanvas({
 						<Note
 							key={`${stray.lineId}-${stray.text}`}
 							tone="problem"
-							words={`"${stray.text}" would be drawn with nothing to separate, so it would sit on your profile as a stray mark.`}
+							words={t(
+								'"{text}" would be drawn with nothing to separate, so it would sit on your profile as a stray mark.',
+								{ text: stray.text },
+							)}
 						/>
 					))}
 					{repeats.map((repeat) => (
 						<Note
 							key={`${repeat.variable}-${repeat.lineIds.join()}`}
 							tone="warning"
-							words={describeRepeat(repeat, report, samples, pieces)}
+							words={describeRepeat(repeat, report, samples, pieces, t)}
 						/>
 					))}
 					{/* A line empty for one example and not the other is the pieces doing their job,
@@ -260,22 +277,24 @@ export function LayoutCanvas({
 							<Note
 								key={line.id}
 								tone="warning"
-								words={`${line.label} draws nothing in either example, so Discord would leave it off.`}
+								words={t("{line} draws nothing in either example, so Discord would leave it off.", {
+									line: t(line.label),
+								})}
 							/>
 						))}
 				</div>
 
 				<div className="flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-4">
 					<p id={`${id}-status`} className="type-caption text-muted-foreground">
-						{status()}
+						{t(status())}
 					</p>
 					<div className="flex items-center gap-2">
 						<Button variant="ghost" size="sm" onClick={onReset}>
-							Reset to the default
+							{t("Reset to the default")}
 						</Button>
 						{draft.isDirty && (
 							<Button variant="ghost" size="sm" onClick={draft.discard}>
-								Discard changes
+								{t("Discard changes")}
 							</Button>
 						)}
 						<Button
@@ -288,7 +307,7 @@ export function LayoutCanvas({
 								if (canSave) void draft.save()
 							}}
 						>
-							Save
+							{t("Save")}
 						</Button>
 					</div>
 				</div>
@@ -434,6 +453,7 @@ function Slot({
 	onLift,
 	onText,
 }: SlotProps): JSX.Element {
+	const t = useT()
 	const opening = over?.lineIndex === index ? over.index : null
 
 	return (
@@ -486,7 +506,9 @@ function Slot({
 			</ul>
 
 			{line.length === 0 && opening === null && (
-				<span className="type-caption text-faint">{whenEmpty ?? `${label}, empty`}</span>
+				<span className="type-caption text-faint">
+					{whenEmpty ? t(whenEmpty) : t("{label}, empty", { label: t(label) })}
+				</span>
 			)}
 		</div>
 	)
@@ -497,12 +519,13 @@ function Slot({
  * with the ghost it left behind, the two say where it came from and where it is going.
  */
 function Opening({ label }: { label: string }): JSX.Element {
+	const t = useT()
 	return (
 		<li
 			aria-hidden="true"
 			className="type-caption inline-flex items-center rounded-pill bg-raised px-2 py-[2px] text-transparent"
 		>
-			{label || "here"}
+			{t(label || "here")}
 		</li>
 	)
 }
@@ -520,12 +543,13 @@ function PalettePiece({
 	onGrab: (event: ReactPointerEvent<HTMLElement>) => void
 	onAdd: () => void
 }): JSX.Element {
+	const t = useT()
 	return (
 		<button
 			type="button"
 			onPointerDown={onGrab}
 			onClick={onAdd}
-			aria-label={`Add ${label}`}
+			aria-label={t("Add {label}", { label: t(label) })}
 			className={cn(
 				"button flex w-full cursor-grab touch-none select-none items-center gap-2",
 				"rounded-md border border-divider bg-card px-3 py-2 text-start",
@@ -538,9 +562,9 @@ function PalettePiece({
 		>
 			<Grip />
 			<span className="flex min-w-0 flex-col">
-				<span className="type-label text-strong">{label}</span>
+				<span className="type-label text-strong">{t(label)}</span>
 				<span className="type-caption truncate text-muted-foreground">
-					{held || "nothing here"}
+					{held === "" ? t("nothing here") : held}
 				</span>
 			</span>
 		</button>
@@ -606,28 +630,34 @@ function describeRepeat(
 	report: LayoutReport,
 	samples: readonly PreviewSample[],
 	pieces: readonly PieceInfo[],
+	t: ReturnType<typeof useT>,
 ): string {
 	const where = join(
-		repeat.lineIds.map(
-			(lineId) => report.lines.find((line) => line.id === lineId)?.label ?? lineId,
+		repeat.lineIds.map((lineId) =>
+			t(report.lines.find((line) => line.id === lineId)?.label ?? lineId),
 		),
+		t("and"),
 	)
 	const when =
 		repeat.sampleIds.length === samples.length
 			? ""
-			: ` for ${join(
-					repeat.sampleIds.map(
-						(sampleId) => samples.find((one) => one.id === sampleId)?.inSentence ?? sampleId,
+			: t(" for {samples}", {
+					samples: join(
+						repeat.sampleIds.map((sampleId) =>
+							t(samples.find((one) => one.id === sampleId)?.inSentence ?? sampleId),
+						),
+						t("and"),
 					),
-				)}`
+				})
 
-	if (repeat.sameText) return `${where} show the same thing${when}. Discord draws both.`
+	if (repeat.sameText)
+		return t("{where} show the same thing{when}. Discord draws both.", { where, when })
 
-	const noun = pieces.find((info) => info.name === repeat.variable)?.noun ?? repeat.variable
-	return `The ${noun} shows on ${where}${when}.`
+	const noun = t(pieces.find((info) => info.name === repeat.variable)?.noun ?? repeat.variable)
+	return t("The {noun} shows on {where}{when}.", { noun, where, when })
 }
 
-function join(parts: readonly string[]): string {
+function join(parts: readonly string[], and = "and"): string {
 	if (parts.length <= 1) return parts[0] ?? ""
-	return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`
+	return `${parts.slice(0, -1).join(", ")} ${and} ${parts[parts.length - 1]}`
 }

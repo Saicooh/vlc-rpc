@@ -41,7 +41,7 @@ describe("describeUpdateOffer", () => {
 	it("explains why an unidentified copy needs a manual update", () => {
 		const offer = describeUpdateOffer("unknown", { kind: "available", version: "5.0.0" })
 		expect(offer.kind).toBe("release-page")
-		expect(offer.kind === "release-page" && offer.detail).toContain("could not tell")
+		expect(offer.kind === "release-page" && offer.detailKey).toContain("could not tell")
 	})
 
 	it("offers an installed copy the install, and nothing else", () => {
@@ -60,8 +60,8 @@ describe("describeUpdateOffer", () => {
 		).toEqual({
 			kind: "working",
 			version: "5.0.0",
-			label: "Updating to 5.0.0",
-			detail: "Downloading 5.0.0. The app restarts on its own to finish.",
+			labelKey: "Updating to {version}",
+			detailKey: "Downloading {version}. The app restarts on its own to finish.",
 			percent: 7,
 		})
 		expect(describeUpdateOffer("setup", { kind: "ready", version: "5.0.0" }).kind).toBe("working")
@@ -85,7 +85,7 @@ describe("describeUpdateOffer", () => {
 				const offer = describeUpdateOffer(install, availability)
 				if (offer.kind === "none") continue
 
-				expect(offer.label).toContain("5.0.0")
+				expect(offer.labelKey).toContain("{version}")
 				expect(offer.version).toBe("5.0.0")
 			}
 		}
@@ -95,9 +95,9 @@ describe("describeUpdateOffer", () => {
 		const installed = describeUpdateOffer("setup", { kind: "available", version: "5.0.0" })
 		const portable = describeUpdateOffer("portable", { kind: "available", version: "5.0.0" })
 
-		expect(installed.kind === "install" && installed.detail).toContain("restarts")
-		expect(portable.kind === "release-page" && portable.detail).toContain("release page")
-		expect(portable.kind === "release-page" && portable.detail).not.toContain("restarts")
+		expect(installed.kind === "install" && installed.detailKey).toContain("restarts")
+		expect(portable.kind === "release-page" && portable.detailKey).toContain("release page")
+		expect(portable.kind === "release-page" && portable.detailKey).not.toContain("restarts")
 	})
 
 	it("gives every offer a label and a detail", () => {
@@ -106,8 +106,8 @@ describe("describeUpdateOffer", () => {
 				const offer = describeUpdateOffer(install, availability)
 				if (offer.kind === "none") continue
 
-				expect(offer.label.length).toBeGreaterThan(0)
-				expect(offer.detail.length).toBeGreaterThan(0)
+				expect(offer.labelKey.length).toBeGreaterThan(0)
+				expect(offer.detailKey.length).toBeGreaterThan(0)
 			}
 		}
 	})
