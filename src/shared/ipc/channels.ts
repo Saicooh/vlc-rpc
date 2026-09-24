@@ -157,6 +157,7 @@ export interface IpcInvokeChannelMap {
 	"window:maximize": { request: []; response: undefined }
 	"window:close": { request: []; response: undefined }
 	"window:is-maximized": { request: []; response: boolean }
+	"window:is-visible": { request: []; response: boolean }
 
 	// ── System ──────────────────────────────────────────────────────────────
 	"system:platform": { request: []; response: string }
@@ -168,6 +169,7 @@ export interface IpcInvokeChannelMap {
 /** One-way pushes from main, keyed by channel with the payload as the value. */
 export interface IpcEventMap {
 	"window:maximized-change": boolean
+	"window:visibility-change": boolean
 	/**
 	 * One event for the whole of what the renderer needs to know about a
 	 * release. Six untyped ones meant the renderer rebuilt the state machine

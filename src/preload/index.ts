@@ -48,10 +48,14 @@ const api = {
 		maximize: typedInvoke("window:maximize"),
 		close: typedInvoke("window:close"),
 		isMaximized: typedInvoke("window:is-maximized"),
+		isVisible: typedInvoke("window:is-visible"),
 		getPlatform: typedInvoke("system:platform"),
 		setStartWithSystem: typedInvoke("app:set-start-with-system"),
 		onMaximizedChange: (callback: (isMaximized: boolean) => void) => {
 			return onEvent("window:maximized-change", callback)
+		},
+		onVisibilityChange: (callback: (isVisible: boolean) => void) => {
+			return onEvent("window:visibility-change", callback)
 		},
 	},
 	update: {

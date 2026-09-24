@@ -7,6 +7,11 @@ import type { VlcConfigSaveResult } from "@shared/ipc/channels"
 import { vlcConfigStore, vlcConnectionReasonStore, vlcStatusStore } from "./vlc.store"
 
 let statusPollingInterval: ReturnType<typeof setInterval> | null = null
+let statusRefreshInFlight = false
+let visibilityListenerInstalled = false
+let windowVisible = false
+let visibilityVersion = 0
+let initialized = false
 
 export async function loadVlcConfig(): Promise<VlcConfig | null> {
 	try {
@@ -77,24 +82,36 @@ export async function repairVlcConfig(): Promise<SaveVlcConfigResult> {
 	return await saveVlcConfig({ ...current, httpEnabled: true })
 }
 
-function startStatusPolling(interval = 2000): void {
-	if (statusPollingInterval) {
-		clearInterval(statusPollingInterval)
-	}
+function startStatusPolling(): void {
+	if (!canPoll() || statusPollingInterval) return
 
-	refreshVlcStatus()
-	statusPollingInterval = setInterval(refreshVlcStatus, interval)
-	logger.info(`VLC status polling started (${interval}ms)`)
+	statusPollingInterval = setInterval(() => void refreshVlcStatus(), 2000)
+	void refreshVlcStatus()
+	logger.info("VLC status polling started (2000ms)")
+}
+
+function canPoll(): boolean {
+	return initialized && windowVisible && document.visibilityState === "visible"
+}
+
+function stopStatusPolling(): void {
+	if (!statusPollingInterval) return
+	clearInterval(statusPollingInterval)
+	statusPollingInterval = null
 }
 
 async function refreshVlcStatus(): Promise<void> {
-	if (vlcStatusStore.get() === "disconnected") {
-		const isConnected = await checkVlcConnection()
-		if (!isConnected) return
-	}
+	if (!canPoll() || statusRefreshInFlight) return
+	statusRefreshInFlight = true
 
 	try {
+		if (vlcStatusStore.get() === "disconnected") {
+			const isConnected = await checkVlcConnection()
+			if (!isConnected || !canPoll()) return
+		}
+
 		const status = await window.api.vlc.getStatus(true)
+		if (!canPoll()) return
 
 		if (status) {
 			vlcStatusStore.set("connected")
@@ -106,14 +123,30 @@ async function refreshVlcStatus(): Promise<void> {
 	} catch (error) {
 		logger.error(`Error refreshing VLC status: ${error}`)
 		await checkVlcConnection()
+	} finally {
+		statusRefreshInFlight = false
 	}
 }
 
 export async function initializeVlcStore(): Promise<void> {
-	await loadVlcConfig()
-	const isConnected = await checkVlcConnection()
-
-	if (isConnected) {
-		startStatusPolling()
+	if (!visibilityListenerInstalled) {
+		document.addEventListener("visibilitychange", () => {
+			if (canPoll()) startStatusPolling()
+			else stopStatusPolling()
+		})
+		window.api.app.onVisibilityChange((visible) => {
+			visibilityVersion++
+			windowVisible = visible
+			if (canPoll()) startStatusPolling()
+			else stopStatusPolling()
+		})
+		visibilityListenerInstalled = true
 	}
+
+	const version = visibilityVersion
+	const visible = await window.api.app.isVisible()
+	if (visibilityVersion === version) windowVisible = visible
+	await loadVlcConfig()
+	initialized = true
+	startStatusPolling()
 }

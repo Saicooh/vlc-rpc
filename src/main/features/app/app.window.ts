@@ -42,6 +42,9 @@ export class Window {
 		registerHandler("window:is-maximized", () => {
 			return this.mainWindow?.isMaximized() || false
 		})
+		registerHandler("window:is-visible", () => {
+			return this.mainWindow?.isVisible() || false
+		})
 
 		registerHandler("system:platform", () => {
 			return process.platform
@@ -164,12 +167,16 @@ export class Window {
 		})
 
 		this.mainWindow.on("show", () => {
+			this.mainWindow?.webContents.send("window:visibility-change", true)
 			if (!this.discord.isConnected()) {
 				logger.info("Window shown, trying to reconnect to Discord")
 				this.discord.connect().catch((error) => {
 					logger.error(`Failed to reconnect to Discord when showing window: ${error}`)
 				})
 			}
+		})
+		this.mainWindow.on("hide", () => {
+			this.mainWindow?.webContents.send("window:visibility-change", false)
 		})
 
 		if (is.dev && process.env.ELECTRON_RENDERER_URL) {

@@ -62,9 +62,11 @@ declare global {
 				maximize: () => Promise<void>
 				close: () => Promise<void>
 				isMaximized: () => Promise<boolean>
+				isVisible: () => Promise<boolean>
 				getPlatform: () => Promise<string>
 				setStartWithSystem: (enabled: boolean) => Promise<boolean>
 				onMaximizedChange: (callback: (isMaximized: boolean) => void) => () => void
+				onVisibilityChange: (callback: (isVisible: boolean) => void) => () => void
 			}
 			update: {
 				check: () => Promise<UpdateCheckResult>
