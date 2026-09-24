@@ -235,6 +235,50 @@ describe("DiscordRpcHandler update loop", () => {
 		expect(discord.calls.update).toBe(2)
 	})
 
+	it("keeps the preview and Discord in sync when a pause clear finishes late", async () => {
+		vi.useFakeTimers()
+		const discord = fakeDiscord()
+		let current = status()
+		let finishClear: ((accepted: boolean) => void) | undefined
+		const clear = vi.spyOn(discord.client, "clear")
+		clear
+			.mockImplementationOnce(
+				() =>
+					new Promise<boolean>((resolve) => {
+						finishClear = resolve
+					}),
+			)
+			.mockResolvedValue(true)
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => current),
+			fakePresence(),
+			new FakeClock(),
+		)
+		mockHideWhenPaused.value = true
+
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(1)
+
+		current = status({ status: "paused" })
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(clear).toHaveBeenCalledTimes(1)
+
+		current = status()
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(1)
+		finishClear?.(true)
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(2)
+		expect(handler.getLastPresence().kind).toBe("sent")
+
+		current = status({ status: "paused" })
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(clear).toHaveBeenCalledTimes(2)
+		expect(handler.getLastPresence()).toEqual({ kind: "cleared", reason: "playback-paused" })
+	})
+
 	it("continues to show paused activity by default", async () => {
 		vi.useFakeTimers()
 		const discord = fakeDiscord()

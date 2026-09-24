@@ -25,6 +25,8 @@ function needsEpisodeRetry(status: VlcStatus): boolean {
 
 export class DiscordRpcHandler {
 	private pollIntervalId: NodeJS.Timeout | null = null
+	private updateInFlight: Promise<boolean> | null = null
+	private updateTail: Promise<void> = Promise.resolve()
 	private readonly timeline: Timeline
 	private lastSentKey: string | null = null
 	private wasConnected = false
@@ -152,7 +154,24 @@ export class DiscordRpcHandler {
 	 * presenceKey so an unchanged status skips the actual Discord call, and
 	 * always resends right after a reconnect since Discord has lost state.
 	 */
-	private async updatePresence(force: boolean): Promise<boolean> {
+	private updatePresence(force: boolean): Promise<boolean> {
+		// A slow lookup or Discord clear can outlast the poll interval. Process
+		// updates in order, and let ordinary ticks share the pending result.
+		if (!force && this.updateInFlight) return this.updateInFlight
+		const update = this.updateTail.then(() => this.performUpdatePresence(force))
+		this.updateInFlight = update
+		this.updateTail = update.then(
+			() => {
+				if (this.updateInFlight === update) this.updateInFlight = null
+			},
+			() => {
+				if (this.updateInFlight === update) this.updateInFlight = null
+			},
+		)
+		return update
+	}
+
+	private async performUpdatePresence(force: boolean): Promise<boolean> {
 		try {
 			if (!this.discord.isRpcEnabled()) {
 				// Skipping the update is not enough: the last activity would stay
