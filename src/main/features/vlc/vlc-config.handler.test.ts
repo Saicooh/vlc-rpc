@@ -1,4 +1,13 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+	promises as fs,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -170,12 +179,57 @@ describe.runIf(process.platform === "win32")("setupVlcConfig", () => {
 
 	it("writes vlcrc once VLC is closed", async () => {
 		const handler = await handlerFor("vlcrc-defaults")
+		const file = join(root, "vlc", "vlcrc")
+		const original = readFileSync(file, "utf-8")
 		configSetCalls.length = 0
 
 		expect(
 			await handler.setupVlcConfig({ httpPort: 9080, httpPassword: "secret", httpEnabled: true }),
 		).toBe("saved")
-		expect(readFileSync(join(root, "vlc", "vlcrc"), "utf-8")).toContain("extraintf=http")
+		expect(readFileSync(file, "utf-8")).toContain("extraintf=http")
+		expect(readFileSync(`${file}.bak`, "utf-8")).toBe(original)
 		expect(configSetCalls).toHaveLength(1)
+	})
+
+	it("creates a new vlcrc without a backup when the file is absent", async () => {
+		const handler = await handlerFor(null)
+		const file = join(root, "vlc", "vlcrc")
+
+		expect(
+			await handler.setupVlcConfig({ httpPort: 9080, httpPassword: "secret", httpEnabled: true }),
+		).toBe("saved")
+		expect(readFileSync(file, "utf-8")).toContain("http-port=9080")
+		expect(existsSync(`${file}.bak`)).toBe(false)
+	})
+
+	it("keeps vlcrc unchanged when reading it fails for a reason other than absence", async () => {
+		const handler = await handlerFor("vlcrc-defaults")
+		const file = join(root, "vlc", "vlcrc")
+		const original = readFileSync(file, "utf-8")
+		vi.spyOn(fs, "readFile").mockRejectedValueOnce(
+			Object.assign(new Error("denied"), { code: "EACCES" }),
+		)
+		configSetCalls.length = 0
+
+		expect(
+			await handler.setupVlcConfig({ httpPort: 9080, httpPassword: "secret", httpEnabled: true }),
+		).toBe("failed")
+		expect(readFileSync(file, "utf-8")).toBe(original)
+		expect(configSetCalls).toHaveLength(0)
+	})
+
+	it("leaves the original file intact if the replacement fails", async () => {
+		const handler = await handlerFor("vlcrc-defaults")
+		const file = join(root, "vlc", "vlcrc")
+		const original = readFileSync(file, "utf-8")
+		vi.spyOn(fs, "rename").mockRejectedValueOnce(new Error("locked"))
+		configSetCalls.length = 0
+
+		expect(
+			await handler.setupVlcConfig({ httpPort: 9080, httpPassword: "secret", httpEnabled: true }),
+		).toBe("failed")
+		expect(readFileSync(file, "utf-8")).toBe(original)
+		expect(readFileSync(`${file}.bak`, "utf-8")).toBe(original)
+		expect(configSetCalls).toHaveLength(0)
 	})
 })

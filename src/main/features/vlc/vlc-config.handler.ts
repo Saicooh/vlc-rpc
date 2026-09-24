@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { promises as fs } from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -141,8 +142,14 @@ export class VlcConfigHandler {
 			let configContent: string[] = []
 			let configModified = false
 
+			let content: string | null = null
 			try {
-				const content = await fs.readFile(this.vlcConfigPath, "utf-8")
+				content = await fs.readFile(this.vlcConfigPath, "utf-8")
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+			}
+
+			if (content !== null) {
 				configContent = content.split("\n")
 
 				let luaSectionIndex = -1
@@ -263,7 +270,7 @@ export class VlcConfigHandler {
 						}
 					}
 				}
-			} catch (error) {
+			} else {
 				configContent = [
 					"# VLC Configuration File",
 					"# Configured by VLC Discord RP",
@@ -285,7 +292,7 @@ export class VlcConfigHandler {
 			}
 
 			if (configModified) {
-				await fs.writeFile(this.vlcConfigPath, configContent.join("\n"), "utf-8")
+				await this.writeConfigFile(configContent.join("\n"), content !== null)
 			}
 
 			configService.set("vlc", config)
@@ -301,6 +308,20 @@ export class VlcConfigHandler {
 		} catch (error) {
 			logger.error(`Error configuring VLC: ${error}`)
 			return "failed"
+		}
+	}
+
+	private async writeConfigFile(content: string, hadExistingFile: boolean): Promise<void> {
+		const filePath = this.vlcConfigPath
+		if (!filePath) throw new Error("VLC config path not determined")
+		const temporaryPath = `${filePath}.${randomUUID()}.tmp`
+		try {
+			const mode = hadExistingFile ? (await fs.stat(filePath)).mode & 0o777 : 0o600
+			if (hadExistingFile) await fs.copyFile(filePath, `${filePath}.bak`)
+			await fs.writeFile(temporaryPath, content, { encoding: "utf-8", mode })
+			await fs.rename(temporaryPath, filePath)
+		} finally {
+			await fs.rm(temporaryPath, { force: true })
 		}
 	}
 
