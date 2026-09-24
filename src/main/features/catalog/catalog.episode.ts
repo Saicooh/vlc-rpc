@@ -97,6 +97,14 @@ interface JustWatchEpisodesReply {
 
 export interface EpisodeTitleLookup {
 	resolve(status: VlcStatus, catalog: CatalogResult | null): Promise<string | null>
+	diagnose?(status: VlcStatus, catalog: CatalogResult | null): Promise<EpisodeTitleResolution>
+	clearCache?(): void
+}
+
+export interface EpisodeTitleResolution {
+	title: string | null
+	source: "JustWatch" | "AniList" | "TVMaze" | null
+	reason: "found" | "no-episode" | "not-found" | "unavailable"
 }
 
 function words(title: string): string[] {
@@ -135,8 +143,9 @@ function anilistId(sourceUrl: string | undefined): number | null {
 }
 
 export class EpisodeTitleResolver implements EpisodeTitleLookup {
-	private readonly cache = new Map<string, { value: string | null; expiresAt: number }>()
-	private readonly inflight = new Map<string, Promise<string | null>>()
+	private readonly cache = new Map<string, { value: EpisodeTitleResolution; expiresAt: number }>()
+	private readonly inflight = new Map<string, Promise<EpisodeTitleResolution>>()
+	private generation = 0
 	private readonly preferSpanish: () => boolean
 
 	public constructor(preferSpanish: () => boolean = () => false) {
@@ -144,13 +153,27 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 	}
 
 	public async resolve(status: VlcStatus, catalog: CatalogResult | null): Promise<string | null> {
-		if (status.mediaType !== "video" || catalog?.mediaKind === "movie") return null
+		return (await this.diagnose(status, catalog)).title
+	}
+
+	public clearCache(): void {
+		this.generation++
+		this.cache.clear()
+		this.inflight.clear()
+	}
+
+	public async diagnose(
+		status: VlcStatus,
+		catalog: CatalogResult | null,
+	): Promise<EpisodeTitleResolution> {
+		const absent: EpisodeTitleResolution = { title: null, source: null, reason: "no-episode" }
+		if (status.mediaType !== "video" || catalog?.mediaKind === "movie") return absent
 		const filename = status.media.filename || status.media.title || ""
 		const parsed = parse(filename, status.playback.duration)
-		if (status.media.episodeTitle || parsed.subtitle) return null
+		if (status.media.episodeTitle || parsed.subtitle) return absent
 		const season = status.media.season ?? catalog?.season ?? parsed.season
 		const episode = status.media.episode ?? catalog?.episode ?? parsed.episode
-		if (episode === undefined || episode < 1) return null
+		if (episode === undefined || episode < 1) return absent
 
 		const titles = [
 			catalog?.title,
@@ -177,20 +200,23 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 		if (pending) return pending
 
 		const lookup = this.lookup(candidates, season, episode, id, preferSpanish)
+		const generation = this.generation
 		this.inflight.set(key, lookup)
 		try {
 			const value = await lookup
-			this.cache.set(key, {
-				value,
-				expiresAt: Date.now() + (value ? HIT_TTL_MS : MISS_TTL_MS),
-			})
-			if (this.cache.size > MAX_CACHE_ENTRIES) {
-				const oldest = this.cache.keys().next().value
-				if (oldest) this.cache.delete(oldest)
+			if (generation === this.generation) {
+				this.cache.set(key, {
+					value,
+					expiresAt: Date.now() + (value.title ? HIT_TTL_MS : MISS_TTL_MS),
+				})
+				if (this.cache.size > MAX_CACHE_ENTRIES) {
+					const oldest = this.cache.keys().next().value
+					if (oldest) this.cache.delete(oldest)
+				}
 			}
 			return value
 		} finally {
-			this.inflight.delete(key)
+			if (this.inflight.get(key) === lookup) this.inflight.delete(key)
 		}
 	}
 
@@ -200,33 +226,38 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 		episode: number,
 		id: number | null,
 		preferSpanish: boolean,
-	): Promise<string | null> {
-		if (season !== undefined && season < 1) return null
+	): Promise<EpisodeTitleResolution> {
+		if (season !== undefined && season < 1)
+			return { title: null, source: null, reason: "no-episode" }
+		let unavailable = false
 		if (preferSpanish) {
 			try {
 				const localized = await this.fromJustWatch(titles, season, episode)
-				if (localized) return localized
+				if (localized) return { title: localized, source: "JustWatch", reason: "found" }
 			} catch (error) {
+				unavailable = true
 				logger.warn(`JustWatch Spanish episode title lookup failed: ${error}`)
 			}
 		}
 		if (season === undefined && id !== null) {
 			try {
 				const streamingTitle = await this.fromAniList(id, episode)
-				if (streamingTitle) return streamingTitle
+				if (streamingTitle) return { title: streamingTitle, source: "AniList", reason: "found" }
 			} catch (error) {
+				unavailable = true
 				logger.warn(`AniList episode title lookup failed: ${error}`)
 			}
 		}
 		for (const title of titles) {
 			try {
 				const found = await this.fromTvMaze(title, season, episode)
-				if (found) return found
+				if (found) return { title: found, source: "TVMaze", reason: "found" }
 			} catch (error) {
+				unavailable = true
 				logger.warn(`TVMaze episode title lookup failed: ${error}`)
 			}
 		}
-		return null
+		return { title: null, source: null, reason: unavailable ? "unavailable" : "not-found" }
 	}
 
 	private async fromJustWatch(

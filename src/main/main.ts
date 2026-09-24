@@ -90,7 +90,11 @@ if (!gotTheLock) {
 			() => configService.get("preferSpanishEpisodeTitles") === true,
 		)
 		const videoCover = new Cover.VideoResolver(anilist)
-		const episodeThumbnails = new Cover.EpisodeThumbnailResolver(coverUploader)
+		const episodeThumbnails = new Cover.EpisodeThumbnailResolver(
+			coverUploader,
+			Cover.captureEpisodeFrame,
+			(key) => configService.get("episodeFrameChoices")?.[key],
+		)
 		const musicCache = new Music.Cache(systemClock)
 		// Identifying audio by its sound needs a key of this application's own,
 		// injected at build time. A clone without one keeps every other step of
@@ -146,6 +150,8 @@ if (!gotTheLock) {
 		// Handlers, one per feature
 		new App.AppInfoHandler(startup)
 		new Cover.MetadataHandler(coverStore)
+		const discordRpcHandler = new Discord.DiscordRpcHandler(discord, vlc, presence, systemClock)
+		new Cover.EpisodeFrameHandler(vlc, episodeThumbnails, () => discordRpcHandler.forceNextUpdate())
 		new Media.MediaInfoHandler(
 			artwork,
 			catalogResolver,
@@ -154,8 +160,15 @@ if (!gotTheLock) {
 			imageProxy,
 			cover,
 			episodeTitles,
+			async (status) => {
+				await catalogResolver.retryFor(status)
+				episodeTitles.clearCache()
+				discordRpcHandler.forceNextUpdate()
+			},
+			(key) =>
+				configService.get("showEpisodeThumbnails") === true &&
+				configService.get("episodeFrameChoices")?.[key] !== undefined,
 		)
-		const discordRpcHandler = new Discord.DiscordRpcHandler(discord, vlc, presence, systemClock)
 		// Both resolvers, because the key alone does not say which cache holds what
 		// the correction replaces. The rpc handler, because evicting a cache does
 		// not reach a presence already on screen: that loop diffs on what VLC

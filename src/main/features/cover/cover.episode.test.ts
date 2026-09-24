@@ -6,7 +6,7 @@ vi.mock("@main/core/logger", () => ({
 	logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }))
 
-import { EpisodeThumbnailResolver } from "./cover.episode"
+import { EpisodeThumbnailResolver, episodeFrameKey } from "./cover.episode"
 
 const filename =
 	"[Erai-raws] Uma Musume - Pretty Derby Season 3 - 04 [1080p][Multiple Subtitle][173E422F]"
@@ -35,6 +35,26 @@ function reply(value: unknown, ok = true): { ok: boolean; json: () => Promise<un
 afterEach(() => vi.unstubAllGlobals())
 
 describe("EpisodeThumbnailResolver", () => {
+	it("uses the chosen frame even when a catalog still exists, and can return to automatic art", async () => {
+		const fetchMock = vi.fn(async (url: string) =>
+			url.includes("singlesearch")
+				? reply({ id: 35288, name: "Uma Musume: Pretty Derby" })
+				: reply({ image: { original: "https://static.tvmaze.com/episode.jpg" } }),
+		)
+		vi.stubGlobal("fetch", fetchMock)
+		const key = episodeFrameKey(status(), catalog)
+		expect(key).not.toBeNull()
+		let position: number | undefined = 0.4
+		const capture = vi.fn(async () => Buffer.from("chosen frame"))
+		const uploadImage = vi.fn(async () => "https://example.test/chosen.jpg")
+		const resolver = new EpisodeThumbnailResolver({ uploadImage }, capture, () => position)
+
+		expect(await resolver.resolve(status(), catalog)).toBe("https://example.test/chosen.jpg")
+		expect(capture).toHaveBeenCalledWith(expect.anything(), 0.4)
+		expect(fetchMock).not.toHaveBeenCalled()
+		position = undefined
+		expect(await resolver.resolve(status(), catalog)).toBe("https://static.tvmaze.com/episode.jpg")
+	})
 	it("uses a verified episode image and caches it without capturing the file", async () => {
 		const fetchMock = vi.fn(async (url: string) =>
 			url.includes("singlesearch")

@@ -2,20 +2,16 @@ import { useStore } from "@nanostores/react"
 import { Button } from "@renderer/components/ui/button"
 import { Panel, Row } from "@renderer/components/ui/panel"
 import { vlcStatusStore } from "@renderer/features/vlc"
+import { useT } from "@renderer/i18n"
 import React from "react"
 
 import { useProxiedArtwork } from "../hooks/use-proxied-artwork"
-import { applyCorrection, decideAudioMatch } from "../media.actions"
+import { applyCorrection, decideAudioMatch, refreshMediaInfo } from "../media.actions"
 import type { CorrectionRow } from "../media.format"
-import {
-	audioMatchRow,
-	contentTypeLabel,
-	correctionSummary,
-	formatDuration,
-	formatEpisode,
-} from "../media.format"
+import { audioMatchRow, contentTypeLabel, correctionSummary, formatDuration } from "../media.format"
 import type { MediaState } from "../media.store"
 import { correctionStore, mediaStore } from "../media.store"
+import { EpisodeFramePicker } from "./episode-frame-picker"
 import { OverrideForm } from "./override-form"
 
 interface SourceRow {
@@ -37,11 +33,14 @@ type EditSession = { kind: "closed" } | { kind: "open"; key: string; file: strin
  * title or a wrong cover is one glance away.
  */
 export function SourcePanel(): JSX.Element {
+	const t = useT()
 	const vlcStatus = useStore(vlcStatusStore)
 	const media = useStore(mediaStore)
 	const correction = useStore(correctionStore)
 	const artworkUrl = useProxiedArtwork()
 	const [edit, setEdit] = React.useState<EditSession>({ kind: "closed" })
+	const [retrying, setRetrying] = React.useState(false)
+	const [retryError, setRetryError] = React.useState(false)
 	const formId = React.useId()
 	// Read once, so the key the form is opened on is the key the save is filed
 	// under even though a poll can land between the two.
@@ -63,28 +62,28 @@ export function SourcePanel(): JSX.Element {
 
 	if (vlcStatus !== "connected" || !media.title) {
 		return (
-			<Panel label="What VLC reports">
+			<Panel label={t("What VLC reports")}>
 				<p className="type-body px-4 py-3 text-muted-foreground">
-					{vlcStatus === "connected" ? "Nothing is playing" : "VLC is not connected"}
+					{t(vlcStatus === "connected" ? "Nothing is playing" : "VLC is not connected")}
 				</p>
 			</Panel>
 		)
 	}
 
 	const isAudio = media.contentType === "audio"
-	const rows = sourceRows(media)
+	const rows = sourceRows(media, t)
 	const match = audioMatchRow(media.nameSource, media.overrideActive)
 	// What `playingFile` holds, past the guard that proves there is a file.
 	const sourceFilename = media.fileTitle ?? media.title
 
 	return (
 		<div className="flex flex-col gap-3">
-			<Panel label="What VLC reports">
+			<Panel label={t("What VLC reports")}>
 				{rows.map((row) => (
 					<Row
 						key={row.label}
 						kind="value"
-						label={row.label}
+						label={t(row.label)}
 						value={row.tabular ? <span className="tabular-nums">{row.value}</span> : row.value}
 					/>
 				))}
@@ -92,8 +91,8 @@ export function SourcePanel(): JSX.Element {
 				{overrideKey && match && (
 					<Row
 						kind="value"
-						label="Audio match"
-						value={<output className="block truncate">{match.value}</output>}
+						label={t("Audio match")}
+						value={<output className="block truncate">{t(match.value)}</output>}
 						trailing={
 							match.kind === "decidable" && (
 								<Button
@@ -104,7 +103,7 @@ export function SourcePanel(): JSX.Element {
 										void decideAudioMatch(overrideKey, sourceFilename, match.action)
 									}}
 								>
-									{match.button}
+									{t(match.button)}
 								</Button>
 							)
 						}
@@ -114,12 +113,12 @@ export function SourcePanel(): JSX.Element {
 				{overrideKey && (
 					<Row
 						kind="value"
-						label="Correction"
+						label={t("Correction")}
 						// A live region rather than plain text: the row is where the answer
 						// to "did that save" lives, and it changes without being touched.
 						value={
 							<output className="block truncate">
-								{correctionSummary(correctionRow(media), correction)}
+								{t(correctionSummary(correctionRow(media), correction))}
 							</output>
 						}
 						trailing={
@@ -137,18 +136,74 @@ export function SourcePanel(): JSX.Element {
 									)
 								}
 							>
-								{media.overrideActive ? "Edit correction" : "Correct this file"}
+								{t(media.overrideActive ? "Edit correction" : "Correct this file")}
 							</Button>
 						}
 					/>
 				)}
 			</Panel>
 
+			{media.mediaType === "video" && media.metadataDiagnostic && (
+				<Panel label={t("Lookup details")}>
+					<Row
+						kind="value"
+						label={t("Title source")}
+						value={t(media.metadataDiagnostic.titleSource)}
+					/>
+					{media.episode !== null && (
+						<Row
+							kind="value"
+							label={t("Episode title")}
+							value={
+								media.metadataDiagnostic.episodeSource
+									? t("Found on {source}", { source: t(media.metadataDiagnostic.episodeSource) })
+									: media.metadataDiagnostic.episodeReason === "unavailable"
+										? t("A catalog request failed. Try again.")
+										: t("No matching episode title found")
+							}
+						/>
+					)}
+					<Row
+						kind="value"
+						label={t("Image source")}
+						value={t(media.metadataDiagnostic.imageSource ?? "None")}
+					/>
+					<div className="flex items-center justify-end gap-3 border-t border-divider px-4 py-3">
+						{retryError && (
+							<span role="alert" className="type-caption text-danger-text">
+								{t("Could not retry the lookup.")}
+							</span>
+						)}
+						<Button
+							size="sm"
+							variant="secondary"
+							isLoading={retrying}
+							onClick={async () => {
+								setRetrying(true)
+								setRetryError(false)
+								try {
+									if (!(await window.api.media.retryLookup())) throw new Error("No video")
+									await Promise.all([refreshMediaInfo(), window.api.discord.updatePresence()])
+								} catch {
+									setRetryError(true)
+								} finally {
+									setRetrying(false)
+								}
+							}}
+						>
+							{t("Retry lookup")}
+						</Button>
+					</div>
+				</Panel>
+			)}
+
+			<EpisodeFramePicker media={media} />
+
 			{!overrideKey && (
 				<p className="type-caption text-pretty text-muted-foreground">
 					{isAudio
-						? "This is not a file on disk, so there is nothing to file a correction against."
-						: "This file name carries no title, so there is nothing to file a correction under."}
+						? t("This is not a file on disk, so there is nothing to file a correction against.")
+						: t("This file name carries no title, so there is nothing to file a correction under.")}
 				</p>
 			)}
 
@@ -195,7 +250,7 @@ function deducedKind(media: MediaState): "movie" | "tv" | null {
 	return null
 }
 
-function sourceRows(media: MediaState): SourceRow[] {
+function sourceRows(media: MediaState, t: ReturnType<typeof useT>): SourceRow[] {
 	const rows: SourceRow[] = []
 
 	// Only worth a row when the parse moved: side by side, a bad parse is obvious.
@@ -212,7 +267,14 @@ function sourceRows(media: MediaState): SourceRow[] {
 		rows.push({ label: "Album", value: media.album })
 	}
 
-	const episode = formatEpisode(media.season, media.episode)
+	const episode =
+		media.season !== null && media.episode !== null
+			? t("Season {season}, episode {episode}", { season: media.season, episode: media.episode })
+			: media.season !== null
+				? t("Season {season}", { season: media.season })
+				: media.episode !== null
+					? t("Episode {episode}", { episode: media.episode })
+					: null
 	if (episode) {
 		rows.push({ label: "Episode", value: episode })
 	}
@@ -227,7 +289,7 @@ function sourceRows(media: MediaState): SourceRow[] {
 
 	const kind = contentTypeLabel(media.contentType, media.mediaType)
 	if (kind) {
-		rows.push({ label: "Media type", value: kind })
+		rows.push({ label: "Media type", value: t(kind) })
 	}
 
 	return rows

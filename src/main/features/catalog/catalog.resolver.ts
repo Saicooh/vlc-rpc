@@ -144,6 +144,17 @@ export class Resolver {
 		this.cache.delete(key)
 	}
 
+	/** Recheck the current file without removing any manual correction. */
+	public async retryFor(status: VlcStatus): Promise<void> {
+		const name = videoNameFor(status)
+		if (status.mediaType === "video" && name) {
+			const key = catalogKey(parse(name, status.playback.duration))
+			// A lookup that started before the button press must not refill the cache afterward.
+			await this.inflight.get(key)?.catch(() => undefined)
+			this.cache.delete(key)
+		}
+	}
+
 	private async resolveUncached(parsed: ParsedVideo, key: string): Promise<CatalogResult | null> {
 		if (!parsed.title) {
 			this.cache.setUnresolved(key, "parse-invalid")

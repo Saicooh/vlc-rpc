@@ -100,6 +100,13 @@ export interface IpcInvokeChannelMap {
 
 	// ── Media ───────────────────────────────────────────────────────────────
 	"media:get-info": { request: []; response: (VlcStatus & DetectedMediaInfo) | null }
+	"media:retry-lookup": { request: []; response: boolean }
+	"media:preview-frames": {
+		request: []
+		response: { key: string; frames: Array<{ position: number; dataUrl: string }> } | null
+	}
+	"media:select-frame": { request: [key: string, position: number]; response: boolean }
+	"media:reset-frame": { request: [key: string]; response: boolean }
 
 	// ── Image ───────────────────────────────────────────────────────────────
 	"image:proxy": { request: [url: string]; response: string | null }

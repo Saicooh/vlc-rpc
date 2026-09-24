@@ -48,6 +48,13 @@ declare global {
 			}
 			media: {
 				getMediaInfo: () => Promise<(VlcStatus & DetectedMediaInfo) | null>
+				retryLookup: () => Promise<boolean>
+				previewFrames: () => Promise<{
+					key: string
+					frames: Array<{ position: number; dataUrl: string }>
+				} | null>
+				selectFrame: (key: string, position: number) => Promise<boolean>
+				resetFrame: (key: string) => Promise<boolean>
 			}
 			image: {
 				getAsDataUrl: (url: string) => Promise<string | null>

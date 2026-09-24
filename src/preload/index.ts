@@ -34,6 +34,10 @@ const api = {
 	},
 	media: {
 		getMediaInfo: typedInvoke("media:get-info"),
+		retryLookup: typedInvoke("media:retry-lookup"),
+		previewFrames: typedInvoke("media:preview-frames"),
+		selectFrame: typedInvoke("media:select-frame"),
+		resetFrame: typedInvoke("media:reset-frame"),
 	},
 	image: {
 		getAsDataUrl: typedInvoke("image:proxy"),

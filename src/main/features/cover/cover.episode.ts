@@ -13,6 +13,7 @@ const REQUEST_TIMEOUT_MS = 4000
 const CAPTURE_TIMEOUT_MS = 20000
 const HIT_TTL_MS = 12 * 60 * 60 * 1000
 const MISS_TTL_MS = 5 * 60 * 1000
+export const FRAME_POSITIONS = [0.2, 0.4, 0.6] as const
 
 interface EpisodeImage {
 	image?: { original?: string | null; medium?: string | null } | null
@@ -55,7 +56,11 @@ async function vlcExecutable(): Promise<string> {
 	return process.platform === "win32" ? "vlc.exe" : "vlc"
 }
 
-export async function captureEpisodeFrame(status: VlcStatus): Promise<Buffer | null> {
+export async function captureEpisodeFrame(
+	status: VlcStatus,
+	position = 0.2,
+): Promise<Buffer | null> {
+	if (!FRAME_POSITIONS.includes(position as (typeof FRAME_POSITIONS)[number])) return null
 	const uri = status.media.sourceUri
 	if (!uri?.startsWith("file://")) return null
 	let videoPath: string
@@ -66,7 +71,7 @@ export async function captureEpisodeFrame(status: VlcStatus): Promise<Buffer | n
 	}
 
 	const outputDir = await mkdtemp(join(tmpdir(), "vlc-rpc-episode-"))
-	const start = Math.max(1, Math.floor(status.playback.duration * 0.2))
+	const start = Math.max(1, Math.floor(status.playback.duration * position))
 	try {
 		const executable = await vlcExecutable()
 		await new Promise<void>((done, fail) => {
@@ -113,6 +118,19 @@ export async function captureEpisodeFrame(status: VlcStatus): Promise<Buffer | n
 	}
 }
 
+/** Stable identity shared by the picker and the resolver; only local episodes qualify. */
+export function episodeFrameKey(
+	status: VlcStatus,
+	catalog: CatalogResult | null = null,
+): string | null {
+	if (status.mediaType !== "video" || !status.media.sourceUri?.startsWith("file://")) return null
+	const parsed = parse(status.media.filename || status.media.title || "", status.playback.duration)
+	const episode = status.media.episode ?? catalog?.episode ?? parsed.episode
+	if (!episode || episode < 1 || catalog?.mediaKind === "movie") return null
+	const season = status.media.season ?? catalog?.season ?? parsed.season
+	return `${status.media.sourceUri}|${season ?? "absolute"}|${episode}`
+}
+
 export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 	private readonly cache = new Map<string, { value: string | null; expiresAt: number }>()
 	private readonly inflight = new Map<string, Promise<string | null>>()
@@ -121,8 +139,16 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 		private readonly uploader: {
 			uploadImage: (image: Buffer, filename: string, expiryHours?: number) => Promise<string | null>
 		},
-		private readonly capture: (status: VlcStatus) => Promise<Buffer | null> = captureEpisodeFrame,
+		private readonly capture: (
+			status: VlcStatus,
+			position?: number,
+		) => Promise<Buffer | null> = captureEpisodeFrame,
+		private readonly choiceFor: (key: string) => number | undefined = () => undefined,
 	) {}
+
+	public clearCache(): void {
+		this.cache.clear()
+	}
 
 	public async resolve(status: VlcStatus, catalog: CatalogResult | null): Promise<string | null> {
 		if (status.mediaType !== "video" || catalog?.mediaKind === "movie") return null
@@ -133,13 +159,18 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 		const season = status.media.season ?? catalog?.season ?? parsed.season
 		const episode = status.media.episode ?? catalog?.episode ?? parsed.episode
 		if (!episode || episode < 1) return null
-		const key = `${status.media.sourceUri ?? status.media.filename ?? parsed.title}|${season ?? "absolute"}|${episode}`
+		const frameKey = episodeFrameKey(status, catalog)
+		const chosen = frameKey ? this.choiceFor(frameKey) : undefined
+		const position = FRAME_POSITIONS.includes(chosen as (typeof FRAME_POSITIONS)[number])
+			? chosen
+			: undefined
+		const key = `${status.media.sourceUri ?? status.media.filename ?? parsed.title}|${season ?? "absolute"}|${episode}|${position ?? "catalog"}`
 		const cached = this.cache.get(key)
 		if (cached && Date.now() < cached.expiresAt) return cached.value
 		const pending = this.inflight.get(key)
 		if (pending) return pending
 
-		const lookup = this.lookup(status, catalog, parsed.title, season, episode)
+		const lookup = this.lookup(status, catalog, parsed.title, season, episode, position)
 		this.inflight.set(key, lookup)
 		try {
 			const value = await lookup
@@ -160,14 +191,15 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 		parsedTitle: string,
 		season: number | undefined,
 		episode: number,
+		position?: number,
 	): Promise<string | null> {
-		if (season && season > 0) {
+		if (position === undefined && season && season > 0) {
 			const image = await this.tvMazeImage(catalog?.title, parsedTitle, season, episode)
 			if (image) return image
 		}
 		let frame: Buffer | null
 		try {
-			frame = await this.capture(status)
+			frame = await this.capture(status, position)
 		} catch (error) {
 			logger.warn(`Episode frame capture failed: ${error}`)
 			return null

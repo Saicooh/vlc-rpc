@@ -26,8 +26,15 @@ presence pipeline:
 - **Better VLC metadata handling.** Keeps VLC's real filename separate from its display title, which
   makes catalog parsing reliable even when VLC reports a shortened or cleaned title.
 - **Episode names in Discord.** The presence shows the episode title beside its number when the
-  file name or VLC tags provide it. Otherwise it looks up a matching episode in TVMaze or AniList
-  when available. If it cannot find a reliable match, it keeps the number.
+  file name or VLC tags provide it. Otherwise it looks up a matching episode in JustWatch, TVMaze,
+  or AniList when available. If it cannot find a reliable match, it keeps the number.
+- **Spanish episode title preference.** An option in Settings to prefer Spanish episode titles when
+  resolving through JustWatch, automatically falling back to English.
+- **Episode thumbnails and frame capture.** Optional setting to display TVMaze episode artwork or
+  capture an exact frame from the local playing video via VLC and upload it for Discord presence.
+- **Interface language.** Full interface support in both English and Spanish, selectable in Settings.
+- **Blu-Ray & Radio playback.** Recognizes Blu-Ray media structures, exposing disc title and
+  chapter numbers in the layout builder, alongside clean presence for live radio streams.
 
 The upstream project is [VLC Discord RP](https://github.com/valentin-marquez/vlc-rpc). This fork is
 published at [Saicooh/vlc-rpc](https://github.com/Saicooh/vlc-rpc).
@@ -72,6 +79,7 @@ cover than the wrong one, so a weak match is discarded.
 | Anime | AniList | No |
 | Western television | TVMaze, then Wikipedia page image | No |
 | Films | AniList for anime films, then Wikipedia page image | No |
+| Episode thumbnails (optional) | TVMaze episode artwork or local video frame capture | No |
 
 A file ripped from YouTube usually has no artist and a title that is really its
 filename, so no text search can find it. For those the app computes an acoustic
@@ -180,6 +188,12 @@ it sounds, because a wrong or low resolution cover baked into an MP3 is the most
 want a correction in the first place.
 
 Saved corrections are listed in Settings, where you can see what each one applies to and remove it.
+
+For video, Home shows where the title, episode name, and image came from. Use **Retry lookup** to
+check the catalogs again without removing a correction. With episode thumbnails enabled, a local
+episode also offers **Preview frames** at 20%, 40%, and 60% of the video. The previews stay on your
+PC; choosing one uploads that frame for Discord. **Use automatic image** restores the usual
+artwork choice.
 
 ## Limitations
 

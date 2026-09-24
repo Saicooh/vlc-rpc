@@ -29,6 +29,32 @@ afterEach(() => {
 })
 
 describe("EpisodeTitleResolver", () => {
+	it("reports the provider and rechecks a cached miss after retry", async () => {
+		let title: string | null = null
+		const fetchMock = vi.fn(async (url: string) =>
+			url.includes("singlesearch")
+				? reply({ id: 14459, name: "Re:Zero kara Hajimeru Isekai Seikatsu" })
+				: reply({ name: title }),
+		)
+		vi.stubGlobal("fetch", fetchMock)
+		const resolver = new EpisodeTitleResolver()
+		const video = status("Re.ZERO.S04E17.mkv")
+
+		expect(await resolver.diagnose(video, null)).toEqual({
+			title: null,
+			source: null,
+			reason: "not-found",
+		})
+		title = "Good Loser"
+		expect(await resolver.resolve(video, null)).toBeNull()
+		resolver.clearCache()
+		expect(await resolver.diagnose(video, null)).toEqual({
+			title,
+			source: "TVMaze",
+			reason: "found",
+		})
+		expect(fetchMock).toHaveBeenCalledTimes(4)
+	})
 	it("gets a named episode by exact season and number, sharing and caching the lookup", async () => {
 		const fetchMock = vi.fn(async (url: string) =>
 			url.includes("singlesearch")

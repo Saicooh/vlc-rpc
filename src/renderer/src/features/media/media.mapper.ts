@@ -14,6 +14,7 @@ const FORGOTTEN = {
 	season: null,
 	episode: null,
 	episodeTitle: null,
+	metadataDiagnostic: null,
 	year: null,
 	overrideKey: null,
 	overrideActive: false,
@@ -31,6 +32,7 @@ const NOTHING_PLAYING = {
 	position: null,
 	artwork: null,
 	fileTitle: null,
+	sourceUri: null,
 	mediaType: null,
 	discTitle: null,
 	chapter: null,
@@ -63,6 +65,7 @@ export function mergeVlcStatus(previous: MediaState, status: VlcStatus | null): 
 		discTitle: status.disc?.title ?? null,
 		chapter: status.disc?.chapter ?? null,
 		fileTitle,
+		sourceUri: media.sourceUri ?? null,
 		nowPlaying: media.nowPlaying || null,
 	}
 
