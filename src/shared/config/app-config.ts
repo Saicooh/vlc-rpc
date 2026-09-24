@@ -29,6 +29,8 @@ export interface AppConfig {
 	rpcEnabled: boolean
 	/** Clear the Discord activity while VLC is paused. */
 	hideActivityWhenPaused?: boolean
+	/** Prefer a Spanish episode title when a localized title can be resolved. */
+	preferSpanishEpisodeTitles?: boolean
 	/** While this stands in the future, the presence is off whatever `rpcEnabled` says. */
 	rpcDisabledUntil?: number
 	/** Optional button shown in the Discord presence. */

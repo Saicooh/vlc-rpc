@@ -86,7 +86,9 @@ if (!gotTheLock) {
 		const catalogCache = new Catalog.Cache(systemClock)
 		const anilist = new Catalog.AniListProvider()
 		const catalogResolver = new Catalog.Resolver(catalogCache, anilist, overridesStore)
-		const episodeTitles = new Catalog.EpisodeTitleResolver()
+		const episodeTitles = new Catalog.EpisodeTitleResolver(
+			() => configService.get("preferSpanishEpisodeTitles") === true,
+		)
 		const videoCover = new Cover.VideoResolver(anilist)
 		const musicCache = new Music.Cache(systemClock)
 		// Identifying audio by its sound needs a key of this application's own,

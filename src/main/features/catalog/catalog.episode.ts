@@ -1,11 +1,48 @@
 import { logger } from "@main/core/logger"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
-import { parse } from "./catalog.parser"
+import { parse, takeTrailingSeason } from "./catalog.parser"
 import type { CatalogResult } from "./catalog.types"
 
 const TVMAZE_SEARCH = "https://api.tvmaze.com/singlesearch/shows?q="
 const ANILIST_ENDPOINT = "https://graphql.anilist.co"
 const ANILIST_EPISODES = "query ($id: Int) { Media(id: $id) { streamingEpisodes { title site } } }"
+const JUSTWATCH_ENDPOINT = "https://apis.justwatch.com/graphql"
+const JUSTWATCH_SEARCH = `
+	query EpisodeTitleSearch(
+		$searchTitlesFilter: TitleFilter!
+		$country: Country!
+		$first: Int!
+	) {
+		popularTitles(
+			country: $country
+			filter: $searchTitlesFilter
+			first: $first
+			sortBy: POPULAR
+			sortRandomSeed: 0
+		) {
+			edges {
+				node { id }
+			}
+		}
+	}`
+const JUSTWATCH_EPISODES = `
+	query EpisodeTitleShow($nodeId: ID!, $country: Country!, $language: Language!) {
+		node(id: $nodeId) {
+			... on Show {
+				seasons(sortDirection: ASC) {
+					content(country: $country, language: $language) {
+						... on SeasonContent { seasonNumber }
+					}
+					episodes(sortDirection: ASC) {
+						content(country: $country, language: $language) {
+							title
+							... on EpisodeContent { seasonNumber episodeNumber }
+						}
+					}
+				}
+			}
+		}
+	}`
 const REQUEST_TIMEOUT_MS = 4000
 const HIT_TTL_MS = 24 * 60 * 60 * 1000
 const MISS_TTL_MS = 5 * 60 * 1000
@@ -31,6 +68,31 @@ interface EpisodeReply {
 interface StreamingEpisode {
 	title?: string | null
 	site?: string | null
+}
+
+interface JustWatchSearchReply {
+	data?: {
+		popularTitles?: {
+			edges?: Array<{ node?: { id?: string | null } | null }> | null
+		} | null
+	}
+}
+
+interface JustWatchEpisodeContent {
+	title?: string | null
+	seasonNumber?: number | null
+	episodeNumber?: number | null
+}
+
+interface JustWatchSeason {
+	content?: { seasonNumber?: number | null } | null
+	episodes?: Array<{ content?: JustWatchEpisodeContent | null }> | null
+}
+
+interface JustWatchEpisodesReply {
+	data?: {
+		node?: { seasons?: JustWatchSeason[] | null } | null
+	}
 }
 
 export interface EpisodeTitleLookup {
@@ -60,8 +122,10 @@ function sameShow(requested: string, found: string): boolean {
 
 function actualTitle(value: string | null | undefined, episode: number): string | null {
 	const title = value?.trim()
-	if (!title || /^episode\s+\d+(?:\s*\([^)]*\))?$/i.test(title)) return null
-	if (/^e(?:pisode)?\s*\d+$/i.test(title) || title === String(episode)) return null
+	if (!title) return null
+	if (/^(?:episode|episodio|cap[ií]tulo)\s+\d+(?:\s*\([^)]*\))?$/i.test(title)) return null
+	if (/^(?:e(?:pisode)?|ep(?:isode)?|episodio|cap[ií]tulo)\s*\d+$/i.test(title)) return null
+	if (title === String(episode)) return null
 	return title
 }
 
@@ -73,6 +137,11 @@ function anilistId(sourceUrl: string | undefined): number | null {
 export class EpisodeTitleResolver implements EpisodeTitleLookup {
 	private readonly cache = new Map<string, { value: string | null; expiresAt: number }>()
 	private readonly inflight = new Map<string, Promise<string | null>>()
+	private readonly preferSpanish: () => boolean
+
+	public constructor(preferSpanish: () => boolean = () => false) {
+		this.preferSpanish = preferSpanish
+	}
 
 	public async resolve(status: VlcStatus, catalog: CatalogResult | null): Promise<string | null> {
 		if (status.mediaType !== "video" || catalog?.mediaKind === "movie") return null
@@ -89,15 +158,25 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 			parsed.title,
 			...(parsed.title ? [] : [status.media.title]),
 		].filter((title): title is string => Boolean(title?.trim()))
-		const candidates = [...new Set(titles)]
+		const candidates = [
+			...new Set(
+				titles.flatMap((title) => {
+					const trailingSeason = takeTrailingSeason(title)
+					return trailingSeason && trailingSeason.season === season
+						? [title, trailingSeason.title]
+						: [title]
+				}),
+			),
+		]
 		const id = anilistId(catalog?.sourceUrl)
-		const key = `${candidates.map((title) => words(title).join("")).join("|")}|${season ?? "absolute"}|${episode}|${id ?? ""}`
+		const preferSpanish = this.preferSpanish()
+		const key = `${preferSpanish ? "es" : "en"}|${candidates.map((title) => words(title).join("")).join("|")}|${season ?? "absolute"}|${episode}|${id ?? ""}`
 		const cached = this.cache.get(key)
 		if (cached && Date.now() < cached.expiresAt) return cached.value
 		const pending = this.inflight.get(key)
 		if (pending) return pending
 
-		const lookup = this.lookup(candidates, season, episode, id)
+		const lookup = this.lookup(candidates, season, episode, id, preferSpanish)
 		this.inflight.set(key, lookup)
 		try {
 			const value = await lookup
@@ -120,8 +199,17 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 		season: number | undefined,
 		episode: number,
 		id: number | null,
+		preferSpanish: boolean,
 	): Promise<string | null> {
 		if (season !== undefined && season < 1) return null
+		if (preferSpanish) {
+			try {
+				const localized = await this.fromJustWatch(titles, season, episode)
+				if (localized) return localized
+			} catch (error) {
+				logger.warn(`JustWatch Spanish episode title lookup failed: ${error}`)
+			}
+		}
 		if (season === undefined && id !== null) {
 			try {
 				const streamingTitle = await this.fromAniList(id, episode)
@@ -137,6 +225,59 @@ export class EpisodeTitleResolver implements EpisodeTitleLookup {
 			} catch (error) {
 				logger.warn(`TVMaze episode title lookup failed: ${error}`)
 			}
+		}
+		return null
+	}
+
+	private async fromJustWatch(
+		titles: string[],
+		season: number | undefined,
+		episode: number,
+	): Promise<string | null> {
+		for (const title of titles.slice(0, 2)) {
+			const searchResponse = await this.get(JUSTWATCH_ENDPOINT, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					query: JUSTWATCH_SEARCH,
+					variables: {
+						searchTitlesFilter: { searchQuery: title, objectTypes: ["SHOW"] },
+						country: "ES",
+						first: 3,
+					},
+				}),
+			})
+			if (!searchResponse?.ok) continue
+			const search = (await searchResponse.json()) as JustWatchSearchReply
+			const showId = search.data?.popularTitles?.edges?.[0]?.node?.id
+			if (!showId) continue
+
+			const episodesResponse = await this.get(JUSTWATCH_ENDPOINT, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					query: JUSTWATCH_EPISODES,
+					variables: { nodeId: showId, country: "ES", language: "es" },
+				}),
+			})
+			if (!episodesResponse?.ok) continue
+			const show = (await episodesResponse.json()) as JustWatchEpisodesReply
+			const seasons = show.data?.node?.seasons ?? []
+			const regularSeasons = seasons.filter((item) => (item.content?.seasonNumber ?? 0) > 0)
+			const selected =
+				season === undefined
+					? regularSeasons.length === 1
+						? regularSeasons[0]
+						: undefined
+					: regularSeasons.find((item) => item.content?.seasonNumber === season)
+			if (!selected) continue
+			const found = selected.episodes?.find(
+				(item) =>
+					item.content?.episodeNumber === episode &&
+					(season === undefined || item.content.seasonNumber === season),
+			)
+			const localized = actualTitle(found?.content?.title, episode)
+			if (localized) return localized
 		}
 		return null
 	}
