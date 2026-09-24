@@ -1,5 +1,32 @@
 # Changelog
 
+## 5.1.0
+
+### Minor Changes
+
+- c2f82e6: Show episode names beside season and episode numbers in Discord when VLC tags or the filename provide one, and keep the app preview in sync.
+- 597f448: Add an Experimental setting for episode thumbnails in Discord. Use a verified episode image when available, or upload a frame from the local video when the catalog has none. Keep existing artwork as the fallback.
+- 597f448: Add an Experimental setting to prefer Spanish episode titles when a localized title is available, with English as the fallback.
+- 8e3f1c8: Look up missing episode titles from TVMaze or AniList and show them in Discord and the app preview.
+
+### Patch Changes
+
+- 5b53d3b: Read the VLC playlist URI for video, recognize Blu-Ray folders, use a named rip folder as the title, and expose disc title and chapter as layout pieces. Disc product codes are no longer searched as movie titles.
+- 8f9dc24: The Windows app now runs on Electron 44.4.3, restoring upstream support for its bundled Chromium and Node.js runtime.
+- 6f80472: Keep a single optimized 512 pixel icon in build resources instead of three identical PNG copies.
+- 00f7c17: Add an opt-in setting to clear Discord activity while VLC is paused and restore it when playback resumes.
+- 442f362: Publish local artwork found in video files for Discord and show it before catalog posters, using a video-specific cover cache key.
+- b13db12: Keep the in-app presence preview in sync with Discord when a slow update overlaps a pause or resume. Process presence updates in order so a late clear cannot leave the preview showing a paused state after playback resumes.
+- 1d4853d: Read VLC's web radio `now_playing` metadata and offer it as a Music layout piece with a radio preview.
+- a1e990e: Retry transient VLC playlist failures for the same video and refresh missing artwork during playback after the artwork cache expires.
+- 397bf0f: Resolve anime episode names through verified TVMaze title aliases when AniList has no streaming episode title.
+- 77a2762: Retry episode title lookups with the base series name when the catalog title includes a numbered season.
+- 9067ab4: Use the identified anime title when looking up episodes from abbreviated release filenames.
+- 0b61459: Opening an installed copy yourself now shows its window even when it starts with Windows. You can choose to start in the tray on every launch, and the window stays accessible if the tray cannot be created.
+- 55334fe: When the app cannot tell how it was installed, About now says so and updates go to the release page instead of claiming the copy is portable.
+- 0039bc4: Check whether VLC is running before writing its settings file. Setup, settings, and quick repair now ask users to close VLC and retry so VLC cannot overwrite the change on exit.
+- 153a7bf: Replace the broken Google Images scrape with Wikipedia's page image API for video posters, accepting only exact film or television pages with usable images.
+
 ## 5.0.1
 
 ### Fork additions
@@ -363,7 +390,7 @@
 ### Minor Changes
 
 - 2e83ff7: Make listening status format consistent between playing and paused states
-All notable changes to this project will be documented in this file.
+  All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -379,6 +406,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved upload reliability and success rates
 
 ### Added
+
 - **Discord RPC Tray Controls**: Complete RPC management from system tray
   - Quick RPC Toggle: Enable/disable Discord RPC permanently from tray menu
   - Temporary Disable Options: Disable RPC for predefined durations (15 minutes, 1 hour, 2 hours)
