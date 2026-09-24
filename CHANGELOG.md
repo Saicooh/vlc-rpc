@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.2.0
+
+### Minor Changes
+
+- 72acfe9: Add English and Spanish interface selection, explain video metadata sources with a retry action, and let users preview and choose a local episode frame for Discord artwork.
+
+### Patch Changes
+
+- 3e19c53: Keep existing VLC settings safe when a configuration read or replacement fails, and save a backup before updating them. Cover uploads now time out and pause failed hosts before retrying. Setup explains that embedded cover art is sent to public hosts, and a failed interface view offers a reload button.
+- c2c837d: Pause VLC and media-info polling while the window is hidden, then refresh the interface when it becomes visible. Reuse one image payload across cover upload services and avoid hashing unchanged VLC responses.
+- d163e62: Reduce Windows installer and portable download size by packaging the audio fingerprint binary once and leaving development files out of the app. Keep the binary available at its existing runtime path.
+
 ## 5.1.0
 
 ### Minor Changes
