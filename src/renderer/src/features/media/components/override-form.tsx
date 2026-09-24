@@ -1,5 +1,6 @@
 import { Button } from "@renderer/components/ui/button"
 import { Input } from "@renderer/components/ui/input"
+import { useT } from "@renderer/i18n"
 import { logger } from "@renderer/lib/utils"
 import type { OverrideDraft, OverrideSaveResult } from "@shared/ipc/channels"
 import React from "react"
@@ -51,6 +52,7 @@ export function OverrideForm({
 	onDone,
 	onCancel,
 }: OverrideFormProps): JSX.Element {
+	const t = useT()
 	const titleId = React.useId()
 	const artistId = React.useId()
 	const coverId = React.useId()
@@ -95,7 +97,7 @@ export function OverrideForm({
 				onDone("saved")
 				return
 			}
-			setError(failureMessage(result))
+			setError(failureMessage(result, t))
 		} catch (cause) {
 			logger.error(`Failed to save the override: ${cause}`)
 			setError({
@@ -153,19 +155,19 @@ export function OverrideForm({
 			onSubmit={handleSubmit}
 			className="flex flex-col gap-4 rounded-md border border-divider bg-card p-4"
 		>
-			<p className="type-caption text-muted-foreground">{introFor(isAudio, correctsTags)}</p>
+			<p className="type-caption text-muted-foreground">{t(introFor(isAudio, correctsTags))}</p>
 
 			{(!isAudio || correctsTags) && (
 				<div className="flex flex-col gap-2">
 					<label htmlFor={titleId} className="type-caption text-muted-foreground">
-						{correctsTags ? "Song title" : "Title"}
+						{t(correctsTags ? "Song title" : "Title")}
 					</label>
 					<Input
 						ref={firstFieldRef}
 						id={titleId}
 						value={title}
 						onChange={(event) => setTitle(event.target.value)}
-						placeholder={correctsTags ? "What the song is called" : "What this should be called"}
+						placeholder={t(correctsTags ? "What the song is called" : "What this should be called")}
 					/>
 				</div>
 			)}
@@ -173,20 +175,20 @@ export function OverrideForm({
 			{correctsTags && (
 				<div className="flex flex-col gap-2">
 					<label htmlFor={artistId} className="type-caption text-muted-foreground">
-						Artist
+						{t("Artist")}
 					</label>
 					<Input
 						id={artistId}
 						value={artist}
 						onChange={(event) => setArtist(event.target.value)}
-						placeholder="Who recorded it"
+						placeholder={t("Who recorded it")}
 					/>
 				</div>
 			)}
 
 			<div className="flex flex-col gap-2">
 				<label htmlFor={coverId} className="type-caption text-muted-foreground">
-					{correctsTags ? "Cover image address, if the search misses it" : "Cover image address"}
+					{t(correctsTags ? "Cover image address, if the search misses it" : "Cover image address")}
 				</label>
 				<div className="flex items-center gap-3">
 					{currentCoverUrl && (
@@ -203,19 +205,23 @@ export function OverrideForm({
 						value={cover}
 						onChange={(event) => setCover(event.target.value)}
 						aria-invalid={error?.coverAtFault ? "true" : undefined}
-						placeholder="Paste the address of an image"
+						placeholder={t("Paste the address of an image")}
 					/>
 				</div>
 				<p className="type-caption text-muted-foreground">
 					{correctsTags
-						? "Leave this empty and the search fills it in. Paste an address only for a record no catalog holds."
-						: "Open the image on its own first, then copy its address. The address of the page it sits on will not load."}
+						? t(
+								"Leave this empty and the search fills it in. Paste an address only for a record no catalog holds.",
+							)
+						: t(
+								"Open the image on its own first, then copy its address. The address of the page it sits on will not load.",
+							)}
 				</p>
 			</div>
 
 			{!isAudio && (
 				<fieldset className="flex flex-col gap-2">
-					<legend className="type-caption text-muted-foreground">Media kind</legend>
+					<legend className="type-caption text-muted-foreground">{t("Media kind")}</legend>
 					<div className="flex flex-wrap gap-4">
 						{kindOptions(deducedKind).map((option) => (
 							<label
@@ -230,7 +236,7 @@ export function OverrideForm({
 									onChange={() => setKind(option.value)}
 									className="focus-discord size-4 cursor-pointer [accent-color:hsl(var(--brand))]"
 								/>
-								{option.label}
+								{t(option.label)}
 							</label>
 						))}
 					</div>
@@ -239,16 +245,16 @@ export function OverrideForm({
 
 			{error && (
 				<p role="alert" className="type-caption text-danger-text">
-					{error.message}
+					{t(error.message)}
 				</p>
 			)}
 
 			<div className="flex flex-wrap items-center gap-2">
 				<Button type="submit" size="sm" disabled={!canSave} isLoading={busy === "saving"}>
-					Save correction
+					{t("Save correction")}
 				</Button>
 				<Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-					Cancel
+					{t("Cancel")}
 				</Button>
 				{overrideActive && (
 					<Button
@@ -261,15 +267,15 @@ export function OverrideForm({
 							void handleRemove()
 						}}
 					>
-						Remove correction
+						{t("Remove correction")}
 					</Button>
 				)}
 			</div>
 
 			<p className="type-caption break-all text-muted-foreground">
-				{binding === "file" ? "Kept against this file, at " : "Filed under "}
+				{t(binding === "file" ? "Kept against this file, at " : "Filed under ")}
 				<span className="select-text">{keyLabel(overrideKey, binding)}</span>
-				{binding === "file" && ". Moving or renaming it ends the correction."}
+				{binding === "file" && t(". Moving or renaming it ends the correction.")}
 			</p>
 		</form>
 	)
@@ -321,33 +327,46 @@ function kindOptions(deducedKind: "movie" | "tv" | null): {
  * retype what was pasted, check a dead link, copy the image address rather than
  * the page it sits on, or report a key the store should never have offered.
  */
-function failureMessage(result: Extract<OverrideSaveResult, { saved: false }>): SaveError {
+function failureMessage(
+	result: Extract<OverrideSaveResult, { saved: false }>,
+	t: ReturnType<typeof useT>,
+): SaveError {
 	switch (result.reason) {
 		case "cover-not-a-url":
 			return {
-				message: "That is not a web address. Paste a link that starts with http or https.",
+				message: t("That is not a web address. Paste a link that starts with http or https."),
 				coverAtFault: true,
 			}
 		case "cover-unreachable":
 			return {
 				message:
 					result.status === null
-						? "The cover address did not answer. Check the link, or try again if the site is down."
-						: `The cover address answered ${result.status}. The image has moved or been taken down.`,
+						? t(
+								"The cover address did not answer. Check the link, or try again if the site is down.",
+							)
+						: t("The cover address answered {status}. The image has moved or been taken down.", {
+								status: result.status,
+							}),
 				coverAtFault: true,
 			}
 		case "cover-not-an-image":
 			return {
 				message:
 					result.contentType === null
-						? "That address does not return an image. Open the image itself and copy its address."
-						: `That address returns ${result.contentType}, not an image. Open the image itself and copy its address.`,
+						? t(
+								"That address does not return an image. Open the image itself and copy its address.",
+							)
+						: t(
+								"That address returns {type}, not an image. Open the image itself and copy its address.",
+								{ type: result.contentType },
+							),
 				coverAtFault: true,
 			}
 		case "store-refused":
 			return {
-				message:
+				message: t(
 					"Saving was refused for this file. Nothing was written, and that is a fault in the app rather than in what you typed.",
+				),
 				coverAtFault: false,
 			}
 	}

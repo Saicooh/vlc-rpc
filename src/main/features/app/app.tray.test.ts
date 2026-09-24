@@ -6,7 +6,11 @@ import type { Startup } from "./app.startup"
 
 const { store, captured } = vi.hoisted(() => ({
 	store: { value: {} as Record<string, unknown> },
-	captured: { template: [] as MenuItemConstructorOptions[], failTray: false },
+	captured: {
+		template: [] as MenuItemConstructorOptions[],
+		failTray: false,
+		languageListeners: new Set<() => void>(),
+	},
 }))
 
 vi.mock("@main/core/logger", () => ({
@@ -20,6 +24,13 @@ vi.mock("@main/core/config", () => ({
 		get: (key?: keyof AppConfig) => (key ? store.value[key] : store.value),
 		set: (key: keyof AppConfig, value: unknown) => {
 			store.value[key] = value
+			if (key === "interfaceLanguage") {
+				for (const listener of captured.languageListeners) listener()
+			}
+		},
+		onChange: (_key: keyof AppConfig, listener: () => void) => {
+			captured.languageListeners.add(listener)
+			return () => captured.languageListeners.delete(listener)
 		},
 		delete: (key: keyof AppConfig) => {
 			delete store.value[key]
@@ -75,6 +86,7 @@ vi.mock("electron", () => ({
 	powerMonitor: { on: () => {} },
 }))
 
+import { configService } from "@main/core/config"
 import { Client as DiscordClient } from "@main/features/discord"
 import { Tray } from "./app.tray"
 
@@ -152,6 +164,28 @@ describe("Tray Rich Presence entry", () => {
 		expect(rpcItem().label).toBe("Rich Presence")
 	})
 
+	it("changes every tray label when the interface language changes", () => {
+		const { tray, discord } = makeTray()
+		configService.set("interfaceLanguage", "es")
+		const labels = captured.template.map((item) => item.label).filter(Boolean)
+		expect(labels).toContain("Abrir VLC Discord RP")
+		expect(labels).toContain("Minimizar a la bandeja")
+		expect(labels).toContain("Iniciar con Windows")
+		expect(labels).toContain("Actividad de Discord")
+		expect(labels).toContain("Desactivar durante 15 minutos")
+		expect(labels).toContain("Desactivar durante 1 hora")
+		expect(labels).toContain("Desactivar durante 2 horas")
+		expect(labels).toContain("Salir")
+
+		discord.disableRpcTemporary(15)
+		tray.updateContextMenu()
+		expect(
+			captured.template.some((item) =>
+				item.label?.startsWith("Actividad de Discord (desactivada hasta las "),
+			),
+		).toBe(true)
+	})
+
 	it("agrees with the client after a permanent disable", () => {
 		const { tray, discord } = makeTray()
 
@@ -204,6 +238,7 @@ describe("Tray Rich Presence entry", () => {
 		discord.disableRpcTemporary(30)
 		tray.dispose()
 		captured.template = []
+		configService.set("interfaceLanguage", "es")
 
 		vi.advanceTimersByTime(HALF_HOUR_MS)
 

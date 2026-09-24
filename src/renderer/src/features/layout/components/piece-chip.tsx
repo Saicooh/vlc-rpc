@@ -1,3 +1,4 @@
+import { useT } from "@renderer/i18n"
 import { cn } from "@renderer/lib/utils"
 import type { LayoutPiece } from "@shared/presence/layout"
 import { X } from "phosphor-react"
@@ -46,6 +47,7 @@ export function PieceChip({
 	onLift,
 	onText,
 }: PieceChipProps): JSX.Element {
+	const t = useT()
 	const [settled, setSettled] = useState(!isLanding)
 
 	useEffect(() => {
@@ -95,8 +97,15 @@ export function PieceChip({
 							else return
 							event.preventDefault()
 						}}
-						title={label}
-						aria-label={`${label}, ${drawn === "" ? "nothing to show" : drawn}, on the ${slotLabel}. Press to take it off, or use the arrow keys to move it.`}
+						title={t(label)}
+						aria-label={t(
+							"{label}, {drawn}, on the {slot}. Press to take it off, or use the arrow keys to move it.",
+							{
+								label: t(label),
+								drawn: drawn === "" ? t("nothing to show") : drawn,
+								slot: t(slotLabel),
+							},
+						)}
 						className={cn(
 							"type-caption inline-flex cursor-grab touch-none select-none items-center gap-1",
 							"rounded-pill px-2 py-[2px]",
@@ -109,7 +118,7 @@ export function PieceChip({
 						)}
 					>
 						<Grip />
-						{drawn === "" ? label : drawn}
+						{drawn === "" ? t(label) : drawn}
 						<X size={10} weight="bold" aria-hidden="true" className="opacity-70" />
 					</button>
 				)}
@@ -133,6 +142,7 @@ function TextPiece({
 	onLift: (step: number) => void
 	onRemove: () => void
 }): JSX.Element {
+	const t = useT()
 	const field = useRef<HTMLInputElement>(null)
 
 	useEffect(() => {
@@ -153,8 +163,8 @@ function TextPiece({
 				value={piece.text}
 				size={Math.max(piece.text.length, 2)}
 				spellCheck={false}
-				aria-label={`Your own words on the ${slotLabel}`}
-				placeholder="words"
+				aria-label={t("Your own words on the {slot}", { slot: t(slotLabel) })}
+				placeholder={t("words")}
 				onPointerDown={(event) => event.stopPropagation()}
 				onChange={(event) => onText(event.target.value)}
 				onKeyDown={(event) => {
@@ -170,7 +180,7 @@ function TextPiece({
 				type="button"
 				onPointerDown={(event) => event.stopPropagation()}
 				onClick={onRemove}
-				aria-label={`Take your own words off the ${slotLabel}`}
+				aria-label={t("Take your own words off the {slot}", { slot: t(slotLabel) })}
 				className="focus-discord ms-1 rounded-pill text-muted-foreground ring-inset hover:text-body"
 			>
 				<X size={10} weight="bold" aria-hidden="true" />

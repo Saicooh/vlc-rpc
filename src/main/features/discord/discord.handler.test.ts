@@ -466,17 +466,35 @@ describe("DiscordRpcHandler update loop", () => {
 	it("clamps a stale, pre-existing presenceUpdateInterval of 1 up to the 1500ms floor", async () => {
 		mockPresenceUpdateInterval.value = 1
 		vi.useFakeTimers()
-		const setIntervalSpy = vi.spyOn(global, "setInterval")
+		const setTimeoutSpy = vi.spyOn(global, "setTimeout")
 		const discord = fakeDiscord()
 		const vlc = fakeVlc(() => status())
 		const handler = new DiscordRpcHandler(discord.client, vlc, fakePresence(), new FakeClock())
 
 		handler.startUpdateLoop()
 
-		const intervalCall = setIntervalSpy.mock.calls.find(([, ms]) => ms === 1500)
+		const intervalCall = setTimeoutSpy.mock.calls.find(([, ms]) => ms === 1500)
 		expect(intervalCall).toBeDefined()
 
-		setIntervalSpy.mockRestore()
+		setTimeoutSpy.mockRestore()
+	})
+
+	it("uses a changed poll interval on the next scheduled tick", async () => {
+		vi.useFakeTimers()
+		const setTimeoutSpy = vi.spyOn(global, "setTimeout")
+		const handler = new DiscordRpcHandler(
+			fakeDiscord().client,
+			fakeVlc(() => status()),
+			fakePresence(),
+			new FakeClock(),
+		)
+		handler.startUpdateLoop()
+		mockPresenceUpdateInterval.value = 3000
+		await vi.advanceTimersByTimeAsync(1500)
+
+		expect(setTimeoutSpy.mock.calls.some(([, ms]) => ms === 3000)).toBe(true)
+		handler.stopUpdateLoop()
+		setTimeoutSpy.mockRestore()
 	})
 })
 

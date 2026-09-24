@@ -82,9 +82,9 @@ async function main() {
 				[
 					"-NoProfile",
 					"-Command",
-					`Expand-Archive -Path '${archive}' -DestinationPath '${work}' -Force`,
+					"Expand-Archive -LiteralPath $env:VLC_RPC_ARCHIVE -DestinationPath $env:VLC_RPC_WORK -Force",
 				],
-				{ stdio: "inherit" },
+				{ stdio: "inherit", env: { ...process.env, VLC_RPC_ARCHIVE: archive, VLC_RPC_WORK: work } },
 			)
 		} else {
 			execFileSync("tar", ["-xzf", archive, "-C", work], { stdio: "inherit" })

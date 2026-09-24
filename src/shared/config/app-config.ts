@@ -33,6 +33,10 @@ export interface AppConfig {
 	preferSpanishEpisodeTitles?: boolean
 	/** Show episode artwork or an uploaded video frame in Discord. */
 	showEpisodeThumbnails?: boolean
+	/** A chosen local frame position, keyed by the episode's file URI. */
+	episodeFrameChoices?: Record<string, number>
+	/** Language of the application window; Discord metadata uses its own preference. */
+	interfaceLanguage?: "en" | "es"
 	/** While this stands in the future, the presence is off whatever `rpcEnabled` says. */
 	rpcDisabledUntil?: number
 	/** Optional button shown in the Discord presence. */

@@ -1,4 +1,5 @@
 import { Button } from "@renderer/components/ui/button"
+import { useT } from "@renderer/i18n"
 import { CheckCircle } from "phosphor-react"
 
 interface SetupCompleteStepProps {
@@ -12,28 +13,31 @@ export function SetupCompleteStep({
 	onFinish,
 	isLoading,
 }: SetupCompleteStepProps): JSX.Element {
+	const t = useT()
 	return (
 		<div className="space-y-4">
-			<h2 className="type-hero text-strong">VLC is configured</h2>
+			<h2 className="type-hero text-strong">{t("VLC is configured")}</h2>
 
 			<div className="flex gap-3 rounded-md bg-ok/14 p-4">
 				<CheckCircle aria-hidden="true" className="mt-[2px] size-4 shrink-0 text-ok-text" />
 				<div className="space-y-1">
-					<p className="type-label text-ok-text">The HTTP interface is on</p>
+					<p className="type-label text-ok-text">{t("The HTTP interface is on")}</p>
 					<p className="type-body text-body">
-						Play a file in VLC to check that Discord picks it up.
+						{t("Play a file in VLC to check that Discord picks it up.")}
 					</p>
 				</div>
 			</div>
 
-			<p className="type-caption text-muted-foreground">Restart VLC if it was already running.</p>
+			<p className="type-caption text-muted-foreground">
+				{t("Restart VLC if it was already running.")}
+			</p>
 
 			<div className="flex justify-end gap-2 pt-4">
 				<Button variant="secondary" onClick={onBack} disabled={isLoading}>
-					Back
+					{t("Back")}
 				</Button>
 				<Button onClick={onFinish} isLoading={isLoading}>
-					Finish setup
+					{t("Finish setup")}
 				</Button>
 			</div>
 		</div>

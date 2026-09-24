@@ -1,6 +1,7 @@
 import "@renderer/styles/globals.css"
 
 import App from "@renderer/App"
+import { ErrorBoundary } from "@renderer/components/error-boundary"
 import { logger } from "@renderer/lib/utils"
 import React from "react"
 import ReactDOM from "react-dom/client"
@@ -16,6 +17,8 @@ window.addEventListener("unhandledrejection", (event) => {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 	<React.StrictMode>
-		<App />
+		<ErrorBoundary>
+			<App />
+		</ErrorBoundary>
 	</React.StrictMode>,
 )

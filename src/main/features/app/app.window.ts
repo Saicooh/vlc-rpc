@@ -5,6 +5,7 @@ import { registerHandler } from "@main/core/ipc"
 import { logger } from "@main/core/logger"
 import type { Client as DiscordClient } from "@main/features/discord"
 import { BrowserWindow, app, session, shell } from "electron"
+import { isSafeExternalUrl } from "./app.external-url"
 import { LOGIN_LAUNCH_ARG, shouldStartHidden } from "./app.startup"
 import type { Tray } from "./app.tray"
 
@@ -41,6 +42,9 @@ export class Window {
 		registerHandler("window:is-maximized", () => {
 			return this.mainWindow?.isMaximized() || false
 		})
+		registerHandler("window:is-visible", () => {
+			return this.mainWindow?.isVisible() || false
+		})
 
 		registerHandler("system:platform", () => {
 			return process.platform
@@ -59,12 +63,13 @@ export class Window {
 			logger.error(`Error waiting for tray: ${error}`)
 		}
 
+		const scriptSrc = is.dev ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self'"
 		session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
 			callback({
 				responseHeaders: {
 					...details.responseHeaders,
 					"Content-Security-Policy": [
-						`default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;`,
+						`default-src 'self'; script-src ${scriptSrc}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;`,
 					],
 				},
 			})
@@ -124,7 +129,11 @@ export class Window {
 		})
 
 		this.mainWindow.webContents.setWindowOpenHandler((details) => {
-			shell.openExternal(details.url)
+			if (isSafeExternalUrl(details.url)) {
+				void shell.openExternal(details.url).catch((error) => {
+					logger.error(`Could not open external link: ${error}`)
+				})
+			}
 			return { action: "deny" }
 		})
 
@@ -158,12 +167,16 @@ export class Window {
 		})
 
 		this.mainWindow.on("show", () => {
+			this.mainWindow?.webContents.send("window:visibility-change", true)
 			if (!this.discord.isConnected()) {
 				logger.info("Window shown, trying to reconnect to Discord")
 				this.discord.connect().catch((error) => {
 					logger.error(`Failed to reconnect to Discord when showing window: ${error}`)
 				})
 			}
+		})
+		this.mainWindow.on("hide", () => {
+			this.mainWindow?.webContents.send("window:visibility-change", false)
 		})
 
 		if (is.dev && process.env.ELECTRON_RENDERER_URL) {

@@ -9,6 +9,7 @@ import type {
 import type { EpisodeTitleLookup } from "@main/features/catalog/catalog.episode"
 import { parse as parseVideo } from "@main/features/catalog/catalog.parser"
 import type { CoverOutcome } from "@main/features/cover"
+import { episodeFrameKey } from "@main/features/cover/cover.episode"
 import type { CorrectedTags, OverrideTarget } from "@main/features/overrides"
 import type { Client as VlcClient } from "@main/features/vlc"
 import type { ContentMetadata, ContentType, DetectedMediaInfo } from "@shared/media/media.types"
@@ -127,6 +128,8 @@ export class MediaInfoHandler {
 		private readonly imageProxy: ImageProxy,
 		private readonly localVideoArtwork?: { fetch(status: VlcStatus): Promise<CoverOutcome> },
 		private readonly episodeTitles?: EpisodeTitleLookup,
+		private readonly retryLookup?: (status: VlcStatus) => Promise<void> | void,
+		private readonly hasChosenFrame?: (key: string) => boolean,
 	) {
 		this.registerHandlers()
 	}
@@ -149,6 +152,12 @@ export class MediaInfoHandler {
 
 		registerHandler("image:proxy", async (url) => {
 			return await this.imageProxy.getImageAsDataUrl(url)
+		})
+		registerHandler("media:retry-lookup", async () => {
+			const status = await this.vlc.readStatus(true)
+			if (!status?.active || status.mediaType !== "video") return false
+			await this.retryLookup?.(status)
+			return true
 		})
 	}
 
@@ -194,6 +203,12 @@ export class MediaInfoHandler {
 				const catalogResult = await this.catalog.resolve(vlcStatus)
 				const videoName = vlcStatus.media.filename || vlcStatus.media.title || ""
 				const parsed = parseVideo(videoName, vlcStatus.playback.duration)
+				const diagnostic: NonNullable<DetectedMediaInfo["metadata_diagnostic"]> = {
+					titleSource: catalogResult?.sourceName ?? (vlcStatus.media.showName ? "VLC" : "Filename"),
+					episodeSource: null,
+					episodeReason: "no-episode",
+					imageSource: catalogResult?.poster ? (catalogResult.sourceName ?? "Catalog") : null,
+				}
 				if (catalogResult) {
 					// A work can be identified without art, so the title and the kind
 					// are reported whether or not a poster came with them.
@@ -210,20 +225,37 @@ export class MediaInfoHandler {
 					}
 				}
 				if (mediaInfo.content_metadata && !mediaInfo.content_metadata.episode_title) {
-					const externalEpisodeTitle = await this.episodeTitles?.resolve(vlcStatus, catalogResult)
-					if (externalEpisodeTitle) {
-						mediaInfo.content_metadata.episode_title = externalEpisodeTitle
+					const result = await this.episodeTitles?.diagnose?.(vlcStatus, catalogResult)
+					const title =
+						result?.title ??
+						(result ? null : await this.episodeTitles?.resolve(vlcStatus, catalogResult))
+					if (title) {
+						mediaInfo.content_metadata.episode_title = title
+						diagnostic.episodeSource = result?.source ?? "Catalog"
+						diagnostic.episodeReason = "found"
+					} else {
+						diagnostic.episodeReason = result?.reason ?? "not-found"
 					}
+				} else if (mediaInfo.content_metadata?.episode_title) {
+					diagnostic.episodeSource = vlcStatus.media.episodeTitle ? "VLC" : "Filename"
+					diagnostic.episodeReason = "local"
 				}
 
 				// Outside the branch above on purpose. A work the catalog identifies
 				// as nothing is the case a correction is for, and since TMDB was
 				// removed that is all of western film and television.
 				reportOverrideTarget(mediaInfo, this.catalog.overrideTargetFor(vlcStatus))
+				if (mediaInfo.override_active) diagnostic.titleSource = "Correction"
 
 				if (localCover?.kind === "published") {
 					mediaInfo.content_image_url = localCover.url
+					diagnostic.imageSource = "Local artwork"
 				}
+				const frameKey = episodeFrameKey(vlcStatus, catalogResult)
+				if (frameKey && this.hasChosenFrame?.(frameKey)) {
+					diagnostic.imageSource = "Chosen video frame"
+				}
+				mediaInfo.metadata_diagnostic = diagnostic
 			}
 
 			if (mediaInfo.media?.artworkUrl) {

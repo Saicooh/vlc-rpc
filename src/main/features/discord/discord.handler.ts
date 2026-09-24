@@ -118,9 +118,7 @@ export class DiscordRpcHandler {
 
 			logger.info("Starting Discord presence update loop")
 			this.updatePresence(false)
-			this.pollIntervalId = setInterval(() => {
-				this.updatePresence(false)
-			}, this.pollIntervalMs())
+			this.scheduleNextUpdate()
 
 			return true
 		} catch (error) {
@@ -129,11 +127,18 @@ export class DiscordRpcHandler {
 		}
 	}
 
+	private scheduleNextUpdate(): void {
+		this.pollIntervalId = setTimeout(() => {
+			this.updatePresence(false)
+			this.scheduleNextUpdate()
+		}, this.pollIntervalMs())
+	}
+
 	public stopUpdateLoop(): void {
 		logger.info("Stopping Discord presence update loop")
 
 		if (this.pollIntervalId !== null) {
-			clearInterval(this.pollIntervalId)
+			clearTimeout(this.pollIntervalId)
 			this.pollIntervalId = null
 		}
 

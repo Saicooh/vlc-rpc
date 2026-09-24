@@ -23,6 +23,13 @@ export interface ContentMetadata {
 }
 
 export interface DetectedMediaInfo {
+	/** Sources and outcome of the current video's metadata lookup. */
+	metadata_diagnostic?: {
+		titleSource: string
+		episodeSource: string | null
+		episodeReason: "found" | "local" | "no-episode" | "not-found" | "unavailable"
+		imageSource: string | null
+	}
 	content_type?: ContentType
 	content_metadata?: ContentMetadata
 	/**

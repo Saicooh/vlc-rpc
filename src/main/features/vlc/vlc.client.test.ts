@@ -223,7 +223,7 @@ describe("readStatus", () => {
 		expect(await vlcStatusService.readStatus(true)).toBeNull()
 	})
 
-	it("returns the cached status when the payload hash is unchanged", async () => {
+	it("returns the cached status when the response text is unchanged", async () => {
 		respondWith(fixture("audio-no-art.status"))
 		const first = await vlcStatusService.readStatus(true)
 		const second = await vlcStatusService.readStatus(false)

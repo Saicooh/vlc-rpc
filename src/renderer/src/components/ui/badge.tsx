@@ -12,7 +12,12 @@ const VARIANTS: Record<BadgeVariant, string> = {
 	accent: "bg-brand-wash text-brand-text",
 }
 
-export function Badge({ variant = "neutral", className, ...props }: BadgeProps): JSX.Element {
+export function Badge({
+	variant = "neutral",
+	className,
+	children,
+	...props
+}: BadgeProps): JSX.Element {
 	return (
 		<span
 			className={cn(
@@ -23,6 +28,8 @@ export function Badge({ variant = "neutral", className, ...props }: BadgeProps):
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{children}
+		</span>
 	)
 }

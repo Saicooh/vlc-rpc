@@ -101,29 +101,38 @@ export class Client {
 		this.stopReconnectTimer()
 
 		try {
-			this.rpc = new RpcClient({
+			if (!(await this.disposeRpc())) {
+				this.startReconnectTimer()
+				return false
+			}
+			const rpc = new RpcClient({
 				clientId: this.clientId,
 			})
+			this.rpc = rpc
 
-			this.rpc.on("ready", () => {
+			rpc.on("ready", () => {
+				if (this.rpc !== rpc) return
 				logger.info("Connected to Discord")
 				this.connected = true
 				this.reconnectAttempts = 0
 			})
 
-			this.rpc.on("disconnected", () => {
+			rpc.on("disconnected", () => {
+				if (this.rpc !== rpc) return
 				logger.info("Disconnected from Discord")
 				this.connected = false
 				this.startReconnectTimer()
 			})
 
-			this.rpc.on("error", (err) => {
+			rpc.on("error", (err) => {
+				if (this.rpc !== rpc) return
 				logger.error(`Discord RPC error: ${err}`)
 				this.connected = false
 				this.startReconnectTimer()
 			})
 
-			await this.rpc.login()
+			await rpc.login()
+			if (this.rpc !== rpc) return false
 			this.connected = true
 			logger.info("Connected to Discord RPC")
 			return true
@@ -134,6 +143,21 @@ export class Client {
 			return false
 		} finally {
 			this.connecting = false
+		}
+	}
+
+	/** Keep a failed transport reachable if closing it fails, so a later retry can try again. */
+	private async disposeRpc(): Promise<boolean> {
+		const rpc = this.rpc
+		if (!rpc) return true
+		this.rpc = null
+		try {
+			await rpc.destroy()
+			return true
+		} catch (error) {
+			this.rpc = rpc
+			logger.error(`Error destroying Discord connection: ${error}`)
+			return false
 		}
 	}
 
@@ -170,15 +194,6 @@ export class Client {
 
 	/** Drops the connection before reconnecting, so a stale socket cannot answer. */
 	public async forceReconnect(): Promise<boolean> {
-		if (this.rpc) {
-			try {
-				await this.rpc.destroy()
-			} catch (error) {
-				logger.error(`Error destroying previous connection: ${error}`)
-			}
-			this.rpc = null
-		}
-
 		this.connected = false
 		this.reconnectAttempts = 0
 		return await this.connect()
@@ -302,19 +317,16 @@ export class Client {
 	public async close(): Promise<void> {
 		this.stopReconnectTimer()
 
-		if (this.connected && this.rpc) {
+		if (this.rpc) {
 			try {
-				if (this.rpc.user) {
+				if (this.connected && this.rpc.user) {
 					await this.rpc.user.clearActivity()
 				}
-				await this.rpc.destroy()
-				this.connected = false
-				logger.info("Closed Discord connection")
 			} catch (error) {
-				logger.error(`Error closing Discord connection: ${error}`)
-			} finally {
-				this.rpc = null
+				logger.error(`Error clearing Discord activity on close: ${error}`)
 			}
+			this.connected = false
+			if (await this.disposeRpc()) logger.info("Closed Discord connection")
 		}
 	}
 }

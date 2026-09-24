@@ -1,7 +1,10 @@
+import { useStore } from "@nanostores/react"
 import { Badge } from "@renderer/components/ui/badge"
 import { Button } from "@renderer/components/ui/button"
 import { Panel, Row } from "@renderer/components/ui/panel"
+import { useT } from "@renderer/i18n"
 import { logger } from "@renderer/lib/utils"
+import { configStore } from "@renderer/stores/config.store"
 import type { OverrideListEntry, SavedOverride } from "@shared/ipc/channels"
 import { useCallback, useEffect, useState } from "react"
 import { Link } from "wouter"
@@ -16,6 +19,7 @@ type ListState =
 const REMOVE_BUTTON = "text-danger-text hover:bg-danger-wash hover:text-danger-text"
 
 export function OverridesPanel(): JSX.Element {
+	const t = useT()
 	const [list, setList] = useState<ListState>({ kind: "loading" })
 	const [pendingKey, setPendingKey] = useState<string | null>(null)
 	const [removeFailed, setRemoveFailed] = useState(false)
@@ -62,18 +66,20 @@ export function OverridesPanel(): JSX.Element {
 	}
 
 	return (
-		<Panel label="Corrections">
+		<Panel label={t("Corrections")}>
 			{list.kind === "loading" && (
-				<p className="type-caption px-4 py-3 text-muted-foreground">Loading your corrections</p>
+				<p className="type-caption px-4 py-3 text-muted-foreground">
+					{t("Loading your corrections")}
+				</p>
 			)}
 
 			{list.kind === "failed" && (
 				<div className="flex items-center justify-between gap-4 px-4 py-3">
 					<p className="type-caption text-pretty text-muted-foreground">
-						Could not read your corrections.
+						{t("Could not read your corrections.")}
 					</p>
 					<Button variant="secondary" size="sm" onClick={load}>
-						Try again
+						{t("Try again")}
 					</Button>
 				</div>
 			)}
@@ -92,15 +98,15 @@ export function OverridesPanel(): JSX.Element {
 
 			{removeFailed && (
 				<p className="type-caption px-4 py-3 text-danger-text">
-					Could not remove that correction. Try again.
+					{t("Could not remove that correction. Try again.")}
 				</p>
 			)}
 
 			{list.kind === "ready" && list.entries.length > 0 && (
 				<p className="type-caption text-pretty px-4 py-3 text-muted-foreground">
-					Most corrections are matched on what the app reads from the file, so another release of
-					the same title reads differently and needs one of its own. Music that carries no tags is
-					held against the file itself, and ends if that file moves.
+					{t(
+						"Most corrections are matched on what the app reads from the file, so another release of the same title reads differently and needs one of its own. Music that carries no tags is held against the file itself, and ends if that file moves.",
+					)}
 				</p>
 			)}
 		</Panel>
@@ -114,6 +120,8 @@ interface OverrideRowProps {
 }
 
 function OverrideRow({ entry, isRemoving, onRemove }: OverrideRowProps): JSX.Element {
+	const t = useT()
+	const spanish = useStore(configStore)?.interfaceLanguage === "es"
 	const match = readOverrideKey(entry.key)
 	const headline = headlineFor(entry, match)
 
@@ -122,16 +130,18 @@ function OverrideRow({ entry, isRemoving, onRemove }: OverrideRowProps): JSX.Ele
 			label={
 				<span className="flex min-w-0 items-center gap-2">
 					<span className="truncate">{headline}</span>
-					<Badge>{entry.override.kind === "video" ? "Video" : "Music"}</Badge>
+					<Badge>{t(entry.override.kind === "video" ? "Video" : "Music")}</Badge>
 				</span>
 			}
 			description={
 				<>
 					<span className="block" title={entry.key}>
-						{describeChanges(entry.override)} {describeOverrideScope(match)}
+						{spanish ? describeChangesSpanish(entry.override) : describeChanges(entry.override)}{" "}
+						{spanish ? describeScopeSpanish(match) : describeOverrideScope(match)}
 					</span>
 					<span className="block truncate" title={entry.override.sourceFilename}>
-						Saved from <span className="select-text">{entry.override.sourceFilename}</span>
+						{t("Saved from ")}
+						<span className="select-text">{entry.override.sourceFilename}</span>
 					</span>
 				</>
 			}
@@ -142,28 +152,71 @@ function OverrideRow({ entry, isRemoving, onRemove }: OverrideRowProps): JSX.Ele
 					className={REMOVE_BUTTON}
 					isLoading={isRemoving}
 					onClick={() => onRemove(entry.key)}
-					aria-label={`Remove the correction for ${headline}`}
+					aria-label={t("Remove the correction for {headline}", { headline })}
 				>
-					Remove
+					{t("Remove")}
 				</Button>
 			}
 		/>
 	)
 }
 
+function describeScopeSpanish(match: OverrideMatch): string {
+	switch (match.kind) {
+		case "file":
+			return `Se aplica solo a ${match.path}. Si mueves o renombras el archivo, deja de aplicarse.`
+		case "unreadable":
+			return `Se aplica a ${match.key}.`
+		case "tv":
+			return `Se aplica a la serie ${match.title}, temporada ${match.season}.`
+		case "movie":
+			return `Se aplica a la película ${match.title} de ${match.year}.`
+		case "video":
+			return `Se aplica al vídeo ${match.title}.`
+		case "audio":
+			return `Se aplica a la música de ${match.artist}, del disco ${match.record}.`
+	}
+}
+
+function describeChangesSpanish(override: SavedOverride): string {
+	if (override.kind === "audio") return "Establece la portada."
+	if (override.kind === "as-is")
+		return "Ignora la identificación automática y usa los datos del archivo."
+	const fields: string[] = []
+	if (override.title)
+		fields.push(override.kind === "untagged-audio" ? "el título de la canción" : "el título")
+	if (override.kind === "untagged-audio" && override.artist) fields.push("el artista")
+	if (override.cover) fields.push("la portada")
+	const changes = fields.length ? `Establece ${fields.join(" y ")}.` : ""
+	if (override.kind === "untagged-audio")
+		return `${changes}${override.cover ? "" : " La portada se busca con esos datos."}`
+	return [
+		changes,
+		override.mediaKind === "movie"
+			? "Se muestra como película."
+			: override.mediaKind === "tv"
+				? "Se muestra como serie."
+				: "",
+	]
+		.filter(Boolean)
+		.join(" ")
+}
+
 function EmptyCorrections(): JSX.Element {
+	const t = useT()
 	return (
 		<div className="flex flex-col gap-2 px-4 py-6">
-			<p className="type-label text-body">You have not corrected anything yet.</p>
+			<p className="type-label text-body">{t("You have not corrected anything yet.")}</p>
 			<p className="type-caption text-pretty text-muted-foreground">
-				When the app reads the wrong title or shows the wrong cover art, correct it on Home while
-				the file is playing. What you correct is listed here, so you can see it and take it back.
+				{t(
+					"When the app reads the wrong title or shows the wrong cover art, correct it on Home while the file is playing. What you correct is listed here, so you can see it and take it back.",
+				)}
 			</p>
 			<Link
 				href="/"
 				className="focus-discord type-label w-fit rounded-xs text-brand-text underline-offset-4 hover:underline"
 			>
-				Open Home
+				{t("Open Home")}
 			</Link>
 		</div>
 	)

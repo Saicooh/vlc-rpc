@@ -26,8 +26,15 @@ presence pipeline:
 - **Better VLC metadata handling.** Keeps VLC's real filename separate from its display title, which
   makes catalog parsing reliable even when VLC reports a shortened or cleaned title.
 - **Episode names in Discord.** The presence shows the episode title beside its number when the
-  file name or VLC tags provide it. Otherwise it looks up a matching episode in TVMaze or AniList
-  when available. If it cannot find a reliable match, it keeps the number.
+  file name or VLC tags provide it. Otherwise it looks up a matching episode in JustWatch, TVMaze,
+  or AniList when available. If it cannot find a reliable match, it keeps the number.
+- **Spanish episode title preference.** An option in Settings to prefer Spanish episode titles when
+  resolving through JustWatch, automatically falling back to English.
+- **Episode thumbnails and frame capture.** Optional setting to display TVMaze episode artwork or
+  capture an exact frame from the local playing video via VLC and upload it for Discord presence.
+- **Interface language.** Full interface support in both English and Spanish, selectable in Settings.
+- **Blu-Ray & Radio playback.** Recognizes Blu-Ray media structures, exposing disc title and
+  chapter numbers in the layout builder, alongside clean presence for live radio streams.
 
 The upstream project is [VLC Discord RP](https://github.com/valentin-marquez/vlc-rpc). This fork is
 published at [Saicooh/vlc-rpc](https://github.com/Saicooh/vlc-rpc).
@@ -72,6 +79,7 @@ cover than the wrong one, so a weak match is discarded.
 | Anime | AniList | No |
 | Western television | TVMaze, then Wikipedia page image | No |
 | Films | AniList for anime films, then Wikipedia page image | No |
+| Episode thumbnails (optional) | TVMaze episode artwork or local video frame capture | No |
 
 A file ripped from YouTube usually has no artist and a title that is really its
 filename, so no text search can find it. For those the app computes an acoustic
@@ -126,6 +134,10 @@ The app lives in the system tray, and closing the window does not quit it. Right
 icon to turn Rich Presence off, or to turn it off for 15 minutes, an hour, or two hours, which is
 what you want when you are watching something you would rather not broadcast.
 
+Choose **English** or **Español** under Settings → App → Interface language. This changes the
+window and tray labels immediately. The preference for Spanish episode titles in Discord is a
+separate setting.
+
 An installed copy can start with Windows. Those launches start in the tray when "Keep running in
 the tray" is enabled; opening the app yourself shows the window. To keep the window hidden on
 every launch, turn on "Start in the tray" in Settings or pass `--start-minimized` on the command
@@ -135,8 +147,8 @@ A new release announces itself with a button in the window header, next to the V
 chips, and there is nothing there the rest of the time, so an empty header means you are current.
 If the app cannot tell whether this copy came from the installer, it says so in About and uses
 manual updates until the installation can be identified.
-An installed copy reads "Update to 5.1.0", downloads it and restarts to finish. A portable copy
-reads "Get 5.1.0" and opens the release page, because a portable build cannot replace the file it
+An installed copy reads "Update to 5.2.0", downloads it and restarts to finish. A portable copy
+reads "Get 5.2.0" and opens the release page, because a portable build cannot replace the file it
 is running from. While it downloads, the button becomes the version and the percent. If you would
 rather ask than wait, Settings has a "Check for updates" button under About, which answers next to
 the version it checked.
@@ -177,6 +189,12 @@ want a correction in the first place.
 
 Saved corrections are listed in Settings, where you can see what each one applies to and remove it.
 
+For video, Home shows where the title, episode name, and image came from. Use **Retry lookup** to
+check the catalogs again without removing a correction. With episode thumbnails enabled, a local
+episode also offers **Preview frames** at 20%, 40%, and 60% of the video. The previews stay on your
+PC; choosing one uploads that frame for Discord. **Use automatic image** restores the usual
+artwork choice.
+
 ## Limitations
 
 These are real, and worth knowing before you file a bug.
@@ -193,11 +211,13 @@ label alone and lets you save a correction with the film title and poster. Playb
 come from VLC.
 
 **Embedded cover art is uploaded to a public file host.** To show the artwork inside your media
-files, the app uploads that image to five temporary hosts at once (x0.at, catbox.moe, uguu.se,
-0x0.st, tempfile.org) and gives Discord the first link that comes back. The uploads still in flight
-are cancelled the moment one host answers, but a host that finished first has a copy of its own.
-Anyone holding one of those links can open the image for as long as it lives, and the app asks for
-roughly seven days. Only the image goes up, under a generated name like `cover_1757980800000.jpg`,
+files, the app tries up to five public hosts at once (x0.at, catbox.moe, uguu.se, 0x0.st,
+tempfile.org) and gives Discord the first link that comes back. The uploads still in flight
+are cancelled when one host answers, and unanswered uploads time out after 15 seconds. A failed
+host is skipped briefly on later attempts, but a host that finished first has a copy of its own.
+Anyone holding one of those links can open the image for as long as it lives. The app requests
+expiry where the host supports it; other hosts decide how long to keep the image. Only the image
+goes up, under a generated name like `cover_1757980800000.jpg`,
 so neither your filename nor its path travels with it. If you would rather not, leave Rich Presence
 off for those files, or point a correction at an image that is already on the web, which is handed
 to Discord as a link and uploads nothing.

@@ -7,7 +7,10 @@ import { logger } from "@main/core/logger"
  * allows `data:` and `blob:` for images and nothing remote.
  */
 export class ImageProxy {
-	private cache: Map<string, { dataUrl: string; timestamp: number }> = new Map()
+	private cache = new Map<string, { dataUrl: string; timestamp: number; bytes: number }>()
+	private cacheBytes = 0
+	private readonly maxCacheEntries = 50
+	private readonly maxCacheBytes = 32 * 1024 * 1024
 	private readonly cacheTtl = 3600 // seconds
 
 	constructor() {
@@ -21,9 +24,12 @@ export class ImageProxy {
 
 		const cached = this.cache.get(source)
 		if (cached && Date.now() / 1000 - cached.timestamp < this.cacheTtl) {
+			this.cache.delete(source)
+			this.cache.set(source, cached)
 			logger.info(`Using cached image data for: ${this.sanitizeUrl(source)}`)
 			return cached.dataUrl
 		}
+		if (cached) this.removeCached(source)
 
 		try {
 			let buffer: Buffer
@@ -56,10 +62,7 @@ export class ImageProxy {
 
 			const dataUrl = `data:${contentType};base64,${buffer.toString("base64")}`
 
-			this.cache.set(source, {
-				dataUrl,
-				timestamp: Math.floor(Date.now() / 1000),
-			})
+			this.cacheImage(source, dataUrl)
 
 			return dataUrl
 		} catch (error) {
@@ -68,6 +71,30 @@ export class ImageProxy {
 			)
 			return null
 		}
+	}
+
+	private cacheImage(source: string, dataUrl: string): void {
+		const bytes = Buffer.byteLength(dataUrl)
+		if (bytes > this.maxCacheBytes) return
+		const now = Math.floor(Date.now() / 1000)
+		for (const [key, entry] of this.cache) {
+			if (now - entry.timestamp >= this.cacheTtl) this.removeCached(key)
+		}
+		this.removeCached(source)
+		this.cache.set(source, { dataUrl, timestamp: now, bytes })
+		this.cacheBytes += bytes
+		while (this.cache.size > this.maxCacheEntries || this.cacheBytes > this.maxCacheBytes) {
+			const oldest = this.cache.keys().next().value
+			if (oldest === undefined) break
+			this.removeCached(oldest)
+		}
+	}
+
+	private removeCached(source: string): void {
+		const entry = this.cache.get(source)
+		if (!entry) return
+		this.cacheBytes -= entry.bytes
+		this.cache.delete(source)
 	}
 
 	private getContentTypeFromFileName(fileName: string): string {

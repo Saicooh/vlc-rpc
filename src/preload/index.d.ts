@@ -48,6 +48,13 @@ declare global {
 			}
 			media: {
 				getMediaInfo: () => Promise<(VlcStatus & DetectedMediaInfo) | null>
+				retryLookup: () => Promise<boolean>
+				previewFrames: () => Promise<{
+					key: string
+					frames: Array<{ position: number; dataUrl: string }>
+				} | null>
+				selectFrame: (key: string, position: number) => Promise<boolean>
+				resetFrame: (key: string) => Promise<boolean>
 			}
 			image: {
 				getAsDataUrl: (url: string) => Promise<string | null>
@@ -62,9 +69,11 @@ declare global {
 				maximize: () => Promise<void>
 				close: () => Promise<void>
 				isMaximized: () => Promise<boolean>
+				isVisible: () => Promise<boolean>
 				getPlatform: () => Promise<string>
 				setStartWithSystem: (enabled: boolean) => Promise<boolean>
 				onMaximizedChange: (callback: (isMaximized: boolean) => void) => () => void
+				onVisibilityChange: (callback: (isVisible: boolean) => void) => () => void
 			}
 			update: {
 				check: () => Promise<UpdateCheckResult>

@@ -8,6 +8,7 @@ import {
 	vlcConnectionReasonStore,
 	vlcStatusStore,
 } from "@renderer/features/vlc"
+import { useT } from "@renderer/i18n"
 import { cn } from "@renderer/lib/utils"
 import type { ConnectionStatus } from "@shared/app/app.types"
 import {
@@ -196,6 +197,7 @@ const PANEL = cn(
  * keyboard reaches the actions without ever being trapped.
  */
 function StatusChip({ label, description, onCheck }: StatusChipProps): JSX.Element {
+	const t = useT()
 	const { severity, state, remedy } = description
 	const panelId = useId()
 	const wrapper = useRef<HTMLDivElement>(null)
@@ -332,14 +334,14 @@ function StatusChip({ label, description, onCheck }: StatusChipProps): JSX.Eleme
 			>
 				<StatusDot kind="decorative" tone={TONE[severity]} />
 				<span>{label}</span>
-				<span className={cn(showState ? STATE_COLOUR[severity] : "sr-only")}>{state}</span>
+				<span className={cn(showState ? STATE_COLOUR[severity] : "sr-only")}>{t(state)}</span>
 			</button>
 
 			{isOpen && (
 				<div className={PANEL_ANCHOR}>
 					<div id={panelId} className={PANEL}>
-						<p className="type-label text-strong">{headline}</p>
-						<p className="type-caption text-pretty text-muted-foreground">{detail}</p>
+						<p className="type-label text-strong">{t(headline)}</p>
+						<p className="type-caption text-pretty text-muted-foreground">{t(detail)}</p>
 
 						<div className="mt-1 flex items-stretch gap-2">
 							{remedy.kind === "enable-http" && repair.kind !== "done" && (
@@ -352,12 +354,12 @@ function StatusChip({ label, description, onCheck }: StatusChipProps): JSX.Eleme
 										void handleRepair()
 									}}
 								>
-									{remedy.label}
+									{t(remedy.label)}
 								</Button>
 							)}
 							{remedy.kind === "open-settings" && (
 								<Button size="sm" variant="secondary" className="flex-1" onClick={handleSettings}>
-									{remedy.label}
+									{t(remedy.label)}
 								</Button>
 							)}
 							<Button
@@ -369,7 +371,7 @@ function StatusChip({ label, description, onCheck }: StatusChipProps): JSX.Eleme
 									void handleCheck()
 								}}
 							>
-								Check again
+								{t("Check again")}
 							</Button>
 						</div>
 					</div>

@@ -2,6 +2,7 @@ import { Button } from "@renderer/components/ui/button"
 import { Input } from "@renderer/components/ui/input"
 import { Panel, Row } from "@renderer/components/ui/panel"
 import { Switch } from "@renderer/components/ui/switch"
+import { useT } from "@renderer/i18n"
 import { logger } from "@renderer/lib/utils"
 import { loadConfig, saveConfig } from "@renderer/stores/config.store"
 import type { AppConfig } from "@shared/config/app-config"
@@ -32,6 +33,7 @@ export function AppSettingsPanel({
 	config,
 	canStartWithSystem,
 }: AppSettingsPanelProps): JSX.Element {
+	const t = useT()
 	const [cache, setCache] = useState<CacheState>({ kind: "idle" })
 	const [startupError, setStartupError] = useState<string | null>(null)
 
@@ -70,11 +72,33 @@ export function AppSettingsPanel({
 	}
 
 	return (
-		<Panel label="App">
+		<Panel label={t("App")}>
+			<Row
+				htmlFor="interfaceLanguage"
+				label={t("Interface language")}
+				description={t(
+					"Choose the language used in this window. Episode title language is a separate setting.",
+				)}
+				control={
+					<select
+						id="interfaceLanguage"
+						value={config.interfaceLanguage ?? "en"}
+						onChange={(event) =>
+							void saveConfig("interfaceLanguage", event.target.value === "es" ? "es" : "en")
+						}
+						className="focus-discord type-body h-9 rounded-sm border border-divider bg-inset px-2 text-body"
+					>
+						<option value="en">English</option>
+						<option value="es">Español</option>
+					</select>
+				}
+			/>
 			<Row
 				htmlFor="hideActivityWhenPaused"
-				label="Hide Discord activity while paused"
-				description="Clear your activity when you pause VLC; show it again when playback resumes."
+				label={t("Hide Discord activity while paused")}
+				description={t(
+					"Clear your activity when you pause VLC; show it again when playback resumes.",
+				)}
 				control={
 					<Switch
 						id="hideActivityWhenPaused"
@@ -85,8 +109,8 @@ export function AppSettingsPanel({
 			/>
 			<Row
 				htmlFor="minimizeToTray"
-				label="Keep running in the tray when you minimize"
-				description="Closing or minimizing keeps the app in the tray."
+				label={t("Keep running in the tray when you minimize")}
+				description={t("Closing or minimizing keeps the app in the tray.")}
 				control={
 					<Switch
 						id="minimizeToTray"
@@ -97,8 +121,10 @@ export function AppSettingsPanel({
 			/>
 			<Row
 				htmlFor="startMinimized"
-				label="Start in the tray"
-				description="Keep the window hidden on launch, including when you open the app yourself."
+				label={t("Start in the tray")}
+				description={t(
+					"Keep the window hidden on launch, including when you open the app yourself.",
+				)}
 				control={
 					<Switch
 						id="startMinimized"
@@ -111,14 +137,14 @@ export function AppSettingsPanel({
 			{canStartWithSystem && (
 				<Row
 					htmlFor="startWithSystem"
-					label="Start when Windows starts"
+					label={t("Start when Windows starts")}
 					description={
 						startupError ? (
 							<span role="alert" className="text-danger-text">
-								{startupError}
+								{t(startupError)}
 							</span>
 						) : (
-							"Launch at sign-in; the window stays hidden if the tray option is on."
+							t("Launch at sign-in; the window stays hidden if the tray option is on.")
 						)
 					}
 					control={
@@ -134,9 +160,9 @@ export function AppSettingsPanel({
 			<div className="bg-background p-3 rounded-md space-y-4">
 				<div className="flex items-center justify-between">
 					<div>
-						<p className="text-sm font-medium text-card-foreground">Custom Discord Button</p>
+						<p className="text-sm font-medium text-card-foreground">{t("Custom Discord Button")}</p>
 						<p className="text-xs text-muted-foreground">
-							Add a custom button (e.g., My Profile) to anime Rich Presence
+							{t("Add a custom button (e.g., My Profile) to anime Rich Presence")}
 						</p>
 					</div>
 					<Switch
@@ -152,13 +178,13 @@ export function AppSettingsPanel({
 								htmlFor="custom-button-label"
 								className="text-xs font-medium text-muted-foreground"
 							>
-								Button Label
+								{t("Button Label")}
 							</label>
 							<Input
 								id="custom-button-label"
 								defaultValue={config.customButtonLabel || "My Profile"}
 								onBlur={(e) => saveConfig("customButtonLabel", e.target.value)}
-								placeholder="My Profile"
+								placeholder={t("My Profile")}
 							/>
 						</div>
 						<div className="space-y-1">
@@ -166,7 +192,7 @@ export function AppSettingsPanel({
 								htmlFor="custom-button-url"
 								className="text-xs font-medium text-muted-foreground"
 							>
-								Button URL
+								{t("Button URL")}
 							</label>
 							<Input
 								id="custom-button-url"
@@ -181,13 +207,13 @@ export function AppSettingsPanel({
 			</div>
 
 			<Row
-				label="Uploaded cover art"
+				label={t("Uploaded cover art")}
 				description={
 					<span
 						aria-live="polite"
 						className={cache.kind === "failed" ? "text-danger-text" : undefined}
 					>
-						{CACHE_DESCRIPTION[cache.kind]}
+						{t(CACHE_DESCRIPTION[cache.kind])}
 					</span>
 				}
 				control={
@@ -197,7 +223,7 @@ export function AppSettingsPanel({
 						onClick={handleClearMetadataCache}
 						isLoading={cache.kind === "clearing"}
 					>
-						Clear
+						{t("Clear")}
 					</Button>
 				}
 			/>

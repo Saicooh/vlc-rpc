@@ -34,6 +34,10 @@ const api = {
 	},
 	media: {
 		getMediaInfo: typedInvoke("media:get-info"),
+		retryLookup: typedInvoke("media:retry-lookup"),
+		previewFrames: typedInvoke("media:preview-frames"),
+		selectFrame: typedInvoke("media:select-frame"),
+		resetFrame: typedInvoke("media:reset-frame"),
 	},
 	image: {
 		getAsDataUrl: typedInvoke("image:proxy"),
@@ -48,10 +52,14 @@ const api = {
 		maximize: typedInvoke("window:maximize"),
 		close: typedInvoke("window:close"),
 		isMaximized: typedInvoke("window:is-maximized"),
+		isVisible: typedInvoke("window:is-visible"),
 		getPlatform: typedInvoke("system:platform"),
 		setStartWithSystem: typedInvoke("app:set-start-with-system"),
 		onMaximizedChange: (callback: (isMaximized: boolean) => void) => {
 			return onEvent("window:maximized-change", callback)
+		},
+		onVisibilityChange: (callback: (isVisible: boolean) => void) => {
+			return onEvent("window:visibility-change", callback)
 		},
 	},
 	update: {

@@ -133,9 +133,43 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllGlobals()
+	vi.restoreAllMocks()
+	vi.useRealTimers()
 })
 
 describe("Uploader race", () => {
+	it("builds one image from the exact Buffer slice for all upload services", async () => {
+		const append = vi.spyOn(FormData.prototype, "append")
+		const uploads: Array<{ bytes: number[]; type: string }> = []
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string, init: { body: FormData }) => {
+				const image = [...init.body.values()].find((value) => value instanceof Blob) as Blob
+				uploads.push({
+					bytes: [...new Uint8Array(await image.arrayBuffer())],
+					type: image.type,
+				})
+				return responseFor(new URL(url).hostname, { kind: "url", delayMs: 0 })
+			}),
+		)
+
+		const imageBuffer = Buffer.from([0, 0xff, 0xd8, 0xff, 0xdb, 0]).subarray(1, 5)
+		await new Uploader().uploadImage(imageBuffer, "cover.jpg")
+
+		const appendedImages = append.mock.calls
+			.map(([, value]) => value)
+			.filter((value): value is Blob => value instanceof Blob)
+		expect(appendedImages).toHaveLength(5)
+		expect(appendedImages.every((image) => image === appendedImages[0])).toBe(true)
+		expect(uploads).toHaveLength(5)
+		expect(uploads).toEqual(
+			Array.from({ length: 5 }, () => ({
+				bytes: [0xff, 0xd8, 0xff, 0xdb],
+				type: "image/jpeg",
+			})),
+		)
+	})
+
 	it("fires the upload at every service at once instead of one after another", async () => {
 		const entrants = stubRace((host) =>
 			host === "x0.at" ? { kind: "url", delayMs: 0 } : { kind: "hang" },
@@ -234,5 +268,44 @@ describe("Uploader race", () => {
 
 		expect(logs.error).toEqual([])
 		expect(logs.warn).toEqual([])
+	})
+
+	it("times out unanswered uploads and pauses failed hosts before retrying", async () => {
+		vi.useFakeTimers()
+		const entrants = stubRace(() => ({ kind: "hang" }))
+		const uploader = new Uploader()
+		const first = uploader.uploadImage(artwork(), "cover.jpg")
+		await vi.advanceTimersByTimeAsync(15_000)
+		expect(await first).toBeNull()
+		expect(entrants).toHaveLength(5)
+		expect(entrants.every((entrant) => entrant.signal.aborted)).toBe(true)
+
+		expect(await uploader.uploadImage(artwork(), "cover.jpg")).toBeNull()
+		expect(entrants).toHaveLength(5)
+		await vi.advanceTimersByTimeAsync(30_000)
+		const retry = uploader.uploadImage(artwork(), "cover.jpg")
+		expect(entrants).toHaveLength(10)
+		await vi.advanceTimersByTimeAsync(15_000)
+		expect(await retry).toBeNull()
+	})
+
+	it("holds a rate-limited host longer than a service that returned 503", async () => {
+		vi.useFakeTimers()
+		const entrants = stubRace((host) => ({
+			kind: "status",
+			status: host === "x0.at" ? 429 : 503,
+			delayMs: 0,
+		}))
+		const uploader = new Uploader()
+		const first = uploader.uploadImage(artwork(), "cover.jpg")
+		await vi.advanceTimersByTimeAsync(0)
+		expect(await first).toBeNull()
+
+		await vi.advanceTimersByTimeAsync(30_000)
+		const second = uploader.uploadImage(artwork(), "cover.jpg")
+		await vi.advanceTimersByTimeAsync(0)
+		expect(await second).toBeNull()
+		expect(entrants.filter((entrant) => entrant.host === "x0.at")).toHaveLength(1)
+		expect(entrants).toHaveLength(9)
 	})
 })

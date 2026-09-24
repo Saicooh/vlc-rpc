@@ -1,10 +1,12 @@
 import { Panel, Row } from "@renderer/components/ui/panel"
 import { Switch } from "@renderer/components/ui/switch"
+import { useT } from "@renderer/i18n"
 import { logger } from "@renderer/lib/utils"
 import { saveConfig } from "@renderer/stores/config.store"
 import type { AppConfig } from "@shared/config/app-config"
 
 export function ExperimentalSettingsPanel({ config }: { config: AppConfig }): JSX.Element {
+	const t = useT()
 	async function toggle(
 		option: "preferSpanishEpisodeTitles" | "showEpisodeThumbnails",
 	): Promise<void> {
@@ -16,11 +18,13 @@ export function ExperimentalSettingsPanel({ config }: { config: AppConfig }): JS
 	}
 
 	return (
-		<Panel label="Experimental">
+		<Panel label={t("Experimental")}>
 			<Row
 				htmlFor="preferSpanishEpisodeTitles"
-				label="Prefer Spanish episode titles"
-				description="Use a Spanish episode title when available; fall back to English automatically."
+				label={t("Prefer Spanish episode titles")}
+				description={t(
+					"Use a Spanish episode title when available; fall back to English automatically.",
+				)}
 				control={
 					<Switch
 						id="preferSpanishEpisodeTitles"
@@ -31,8 +35,10 @@ export function ExperimentalSettingsPanel({ config }: { config: AppConfig }): JS
 			/>
 			<Row
 				htmlFor="showEpisodeThumbnails"
-				label="Show episode thumbnails"
-				description="Use an episode image when available. Otherwise, upload a frame from the local video to an image host for Discord."
+				label={t("Show episode thumbnails")}
+				description={t(
+					"Use an episode image when available. Otherwise, upload a frame from the local video to an image host for Discord.",
+				)}
 				control={
 					<Switch
 						id="showEpisodeThumbnails"

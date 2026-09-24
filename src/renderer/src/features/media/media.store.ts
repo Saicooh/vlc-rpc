@@ -18,6 +18,7 @@ export interface MediaState {
 	 * both so a wrong parse is visible, and a correction is filed against it.
 	 */
 	fileTitle: string | null
+	sourceUri: string | null
 	mediaType: "video" | "audio" | null
 	discTitle: number | null
 	chapter: number | null
@@ -33,6 +34,7 @@ export interface MediaState {
 	season: number | null
 	episode: number | null
 	episodeTitle: string | null
+	metadataDiagnostic: DetectedMediaInfo["metadata_diagnostic"] | null
 	year: string | null
 	/**
 	 * Where a manual correction for what is playing would be filed. Null means the
@@ -63,6 +65,7 @@ const INITIAL_STATE: MediaState = {
 	position: null,
 	artwork: null,
 	fileTitle: null,
+	sourceUri: null,
 	mediaType: null,
 	discTitle: null,
 	chapter: null,
@@ -72,6 +75,7 @@ const INITIAL_STATE: MediaState = {
 	season: null,
 	episode: null,
 	episodeTitle: null,
+	metadataDiagnostic: null,
 	year: null,
 	overrideKey: null,
 	overrideActive: false,
