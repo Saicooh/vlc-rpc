@@ -135,8 +135,8 @@ A new release announces itself with a button in the window header, next to the V
 chips, and there is nothing there the rest of the time, so an empty header means you are current.
 If the app cannot tell whether this copy came from the installer, it says so in About and uses
 manual updates until the installation can be identified.
-An installed copy reads "Update to 5.0.1", downloads it and restarts to finish. A portable copy
-reads "Get 5.0.1" and opens the release page, because a portable build cannot replace the file it
+An installed copy reads "Update to 5.1.0", downloads it and restarts to finish. A portable copy
+reads "Get 5.1.0" and opens the release page, because a portable build cannot replace the file it
 is running from. While it downloads, the button becomes the version and the percent. If you would
 rather ask than wait, Settings has a "Check for updates" button under About, which answers next to
 the version it checked.
