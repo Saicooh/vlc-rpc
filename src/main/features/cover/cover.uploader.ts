@@ -1,8 +1,22 @@
 import { logger } from "@main/core/logger"
 import type { FileMetadata } from "@shared/config/app-config"
 
+const UPLOAD_TIMEOUT_MS = 15_000
+const FAILURE_COOLDOWN_MS = 30_000
+const RATE_LIMIT_COOLDOWN_MS = 5 * 60_000
+
+class UploadHttpError extends Error {
+	constructor(readonly status: number) {
+		super(`HTTP ${status}`)
+	}
+}
+
+function requireOk(response: Response): void {
+	if (!response.ok) throw new UploadHttpError(response.status)
+}
+
 interface UploadRequest {
-	imageBuffer: Buffer
+	image: Blob
 	filename: string
 	expiryHours: number
 	signal: AbortSignal
@@ -44,6 +58,7 @@ export class Uploader {
 	private readonly appVersion: string
 	private readonly appName = "VLC-Discord-RPC"
 	private readonly userAgent: string
+	private readonly cooldownUntil = new Map<string, number>()
 
 	private readonly services: ImageUploadService[] = [
 		{
@@ -103,14 +118,20 @@ export class Uploader {
 			}
 		}
 
-		const entrants = this.services.filter((service) => fileSize <= service.maxFileSize)
+		const entrants = this.services.filter(
+			(service) =>
+				fileSize <= service.maxFileSize &&
+				(this.cooldownUntil.get(service.name) ?? 0) <= Date.now(),
+		)
+		if (entrants.length === 0) return null
 		logger.info(`Racing ${entrants.length} upload services: ${filename} (${fileSize} bytes)`)
+		const image = new Blob([Uint8Array.from(imageBuffer)], { type: this.getMimeType(filename) })
 
 		const attempts = entrants.map((service) => {
 			const controller = new AbortController()
 			return {
 				controller,
-				result: this.attempt(service, controller, { imageBuffer, filename, expiryHours }),
+				result: this.attempt(service, controller, { image, filename, expiryHours }),
 			}
 		})
 
@@ -139,6 +160,12 @@ export class Uploader {
 		controller: AbortController,
 		request: Omit<UploadRequest, "signal">,
 	): Promise<RaceWinner> {
+		let timedOut = false
+		const timeout = setTimeout(() => {
+			if (controller.signal.aborted) return
+			timedOut = true
+			controller.abort()
+		}, UPLOAD_TIMEOUT_MS)
 		try {
 			const url = await service.upload({ ...request, signal: controller.signal })
 
@@ -147,12 +174,22 @@ export class Uploader {
 			}
 
 			logger.warn(`Upload to ${service.name} answered without a usable url`)
+			this.cooldownUntil.set(service.name, Date.now() + FAILURE_COOLDOWN_MS)
 		} catch (error) {
 			// Losing the race is how all but one upload ends, and the abort that ends
 			// them is the expected outcome, not a failure worth a line in the log.
-			if (!controller.signal.aborted) {
+			if (!controller.signal.aborted || timedOut) {
 				logger.warn(`Upload to ${service.name} failed: ${errorName(error)}`)
+				this.cooldownUntil.set(
+					service.name,
+					Date.now() +
+						(error instanceof UploadHttpError && error.status === 429
+							? RATE_LIMIT_COOLDOWN_MS
+							: FAILURE_COOLDOWN_MS),
+				)
 			}
+		} finally {
+			clearTimeout(timeout)
 		}
 
 		// Promise.any settles on the first fulfilled promise, so an attempt without a
@@ -160,17 +197,9 @@ export class Uploader {
 		throw new Error(`${service.name} produced no url`)
 	}
 
-	private toBlob(imageBuffer: Buffer, filename: string): Blob {
-		return new Blob([new Uint8Array(imageBuffer)], { type: this.getMimeType(filename) })
-	}
-
-	private async uploadToX0At({
-		imageBuffer,
-		filename,
-		signal,
-	}: UploadRequest): Promise<string | null> {
+	private async uploadToX0At({ image, filename, signal }: UploadRequest): Promise<string | null> {
 		const formData = new FormData()
-		formData.append("file", this.toBlob(imageBuffer, filename), filename)
+		formData.append("file", image, filename)
 
 		const response = await fetch("https://x0.at/", {
 			method: "POST",
@@ -181,23 +210,17 @@ export class Uploader {
 			signal,
 		})
 
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}`)
-		}
+		requireOk(response)
 
 		const result = await response.text()
 		return result.trim().startsWith("http") ? result.trim() : null
 	}
 
-	private async uploadToCatbox({
-		imageBuffer,
-		filename,
-		signal,
-	}: UploadRequest): Promise<string | null> {
+	private async uploadToCatbox({ image, filename, signal }: UploadRequest): Promise<string | null> {
 		const formData = new FormData()
 
 		formData.append("reqtype", "fileupload")
-		formData.append("fileToUpload", this.toBlob(imageBuffer, filename), filename)
+		formData.append("fileToUpload", image, filename)
 
 		const response = await fetch("https://catbox.moe/user/api.php", {
 			method: "POST",
@@ -208,21 +231,15 @@ export class Uploader {
 			signal,
 		})
 
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}`)
-		}
+		requireOk(response)
 
 		const result = await response.text()
 		return result.trim().startsWith("http") ? result.trim() : null
 	}
 
-	private async uploadToUguu({
-		imageBuffer,
-		filename,
-		signal,
-	}: UploadRequest): Promise<string | null> {
+	private async uploadToUguu({ image, filename, signal }: UploadRequest): Promise<string | null> {
 		const formData = new FormData()
-		formData.append("files[]", this.toBlob(imageBuffer, filename), filename)
+		formData.append("files[]", image, filename)
 
 		const response = await fetch("https://uguu.se/upload", {
 			method: "POST",
@@ -233,9 +250,7 @@ export class Uploader {
 			signal,
 		})
 
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}`)
-		}
+		requireOk(response)
 
 		const result = await response.json()
 
@@ -247,14 +262,14 @@ export class Uploader {
 	}
 
 	private async uploadTo0x0st({
-		imageBuffer,
+		image,
 		filename,
 		expiryHours,
 		signal,
 	}: UploadRequest): Promise<string | null> {
 		const formData = new FormData()
 
-		formData.append("file", this.toBlob(imageBuffer, filename), filename)
+		formData.append("file", image, filename)
 		formData.append("expires", expiryHours.toString())
 		formData.append("secret", "")
 
@@ -267,23 +282,21 @@ export class Uploader {
 			signal,
 		})
 
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}`)
-		}
+		requireOk(response)
 
 		const result = await response.text()
 		return result.trim().startsWith("http") ? result.trim() : null
 	}
 
 	private async uploadToTempFile({
-		imageBuffer,
+		image,
 		filename,
 		expiryHours,
 		signal,
 	}: UploadRequest): Promise<string | null> {
 		const formData = new FormData()
 
-		formData.append("files", this.toBlob(imageBuffer, filename), filename)
+		formData.append("files", image, filename)
 		formData.append("expiryHours", tempFileExpiry(expiryHours).toString())
 
 		const response = await fetch("https://tempfile.org/api/upload/local", {
@@ -295,9 +308,7 @@ export class Uploader {
 			signal,
 		})
 
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}`)
-		}
+		requireOk(response)
 
 		const result = await response.json()
 		const url = result.success && result.files?.[0]?.url

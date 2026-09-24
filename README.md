@@ -193,11 +193,13 @@ label alone and lets you save a correction with the film title and poster. Playb
 come from VLC.
 
 **Embedded cover art is uploaded to a public file host.** To show the artwork inside your media
-files, the app uploads that image to five temporary hosts at once (x0.at, catbox.moe, uguu.se,
-0x0.st, tempfile.org) and gives Discord the first link that comes back. The uploads still in flight
-are cancelled the moment one host answers, but a host that finished first has a copy of its own.
-Anyone holding one of those links can open the image for as long as it lives, and the app asks for
-roughly seven days. Only the image goes up, under a generated name like `cover_1757980800000.jpg`,
+files, the app tries up to five public hosts at once (x0.at, catbox.moe, uguu.se, 0x0.st,
+tempfile.org) and gives Discord the first link that comes back. The uploads still in flight
+are cancelled when one host answers, and unanswered uploads time out after 15 seconds. A failed
+host is skipped briefly on later attempts, but a host that finished first has a copy of its own.
+Anyone holding one of those links can open the image for as long as it lives. The app requests
+expiry where the host supports it; other hosts decide how long to keep the image. Only the image
+goes up, under a generated name like `cover_1757980800000.jpg`,
 so neither your filename nor its path travels with it. If you would rather not, leave Rich Presence
 off for those files, or point a correction at an image that is already on the web, which is handed
 to Discord as a link and uploads nothing.
