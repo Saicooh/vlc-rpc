@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto"
 import { configService } from "@main/core/config"
 import { logger } from "@main/core/logger"
 import { bluRayFolderTitle, isBluRaySource } from "@shared/vlc/bluray"
@@ -60,7 +59,7 @@ function reasonForRequestFailure(error: unknown): VlcConnectionReason {
 }
 
 export class Client {
-	private lastStatusHash = ""
+	private lastRawStatus = ""
 	private lastStatus: VlcStatus | null = null
 	private baseUrl = ""
 	private authHeader: Record<string, string> = {}
@@ -111,7 +110,7 @@ export class Client {
 		return Math.max(500, Math.min(10000, raw || 2000))
 	}
 
-	/** `forceUpdate` reparses even when the response hashes the same as the last one. */
+	/** `forceUpdate` reparses even when VLC returns the same response. */
 	public async readStatus(forceUpdate = false): Promise<VlcStatus | null> {
 		const vlcConfig = configService.get("vlc")
 
@@ -149,28 +148,21 @@ export class Client {
 
 			const content = await response.text()
 
-			const contentHash = createHash("md5").update(content).digest("hex")
-
 			const uriUnresolved =
 				this.lastStatus &&
 				this.needsVideoUri(this.lastStatus) &&
 				this.lastStatus.media.sourceUri === undefined &&
 				Date.now() >= this.nextVideoUriRetryAt
-			if (
-				contentHash === this.lastStatusHash &&
-				!forceUpdate &&
-				this.lastStatus &&
-				!uriUnresolved
-			) {
+			if (content === this.lastRawStatus && !forceUpdate && this.lastStatus && !uriUnresolved) {
 				return this.lastStatus
 			}
 
-			this.lastStatusHash = contentHash
 			const vlcStatus: VlcRawStatus = JSON.parse(content)
 
 			const status = this.convertVlcStatus(vlcStatus)
 			await this.attachVideoUri(status, vlcStatus.information)
 			this.lastStatus = status
+			this.lastRawStatus = content
 			return status
 		} catch (error: unknown) {
 			const reason = reasonForRequestFailure(error)
@@ -220,7 +212,7 @@ export class Client {
 				const status = this.convertVlcStatus(vlcStatus)
 				await this.attachVideoUri(status, vlcStatus.information)
 				this.lastStatus = status
-				this.lastStatusHash = createHash("md5").update(content).digest("hex")
+				this.lastRawStatus = content
 
 				this.updateAuthStrategy(vlcConfig.httpPassword)
 
