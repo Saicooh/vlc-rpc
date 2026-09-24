@@ -196,7 +196,11 @@ export class DiscordRpcHandler {
 			}
 
 			const window = this.timeline.update(vlcStatus)
-			const key = presenceKey(vlcStatus, this.timeline.currentEpoch)
+			const mediaKey = presenceKey(vlcStatus, this.timeline.currentEpoch)
+			const key =
+				vlcStatus.mediaType === "video"
+					? `${mediaKey}|es:${configService.get("preferSpanishEpisodeTitles") === true}|thumb:${configService.get("showEpisodeThumbnails") === true}`
+					: mediaKey
 			const sameKey = key === this.lastSentKey
 			const retryArtwork =
 				sameKey &&

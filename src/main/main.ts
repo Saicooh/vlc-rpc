@@ -90,6 +90,7 @@ if (!gotTheLock) {
 			() => configService.get("preferSpanishEpisodeTitles") === true,
 		)
 		const videoCover = new Cover.VideoResolver(anilist)
+		const episodeThumbnails = new Cover.EpisodeThumbnailResolver(coverUploader)
 		const musicCache = new Music.Cache(systemClock)
 		// Identifying audio by its sound needs a key of this application's own,
 		// injected at build time. A clone without one keeps every other step of
@@ -134,6 +135,7 @@ if (!gotTheLock) {
 			new Presence.SyncplayDetector(),
 			cover,
 			episodeTitles,
+			episodeThumbnails,
 		)
 
 		// The tray/window cycle, resolved in fixed order

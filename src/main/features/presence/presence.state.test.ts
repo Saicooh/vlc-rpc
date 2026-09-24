@@ -330,6 +330,9 @@ function videoService(
 	episodeTitles?: {
 		resolve: (status: VlcStatus, result: CatalogResult | null) => Promise<string | null>
 	},
+	episodeThumbnails?: {
+		resolve: (status: VlcStatus, result: CatalogResult | null) => Promise<string | null>
+	},
 ): Service {
 	const artwork = new ArtworkResolver(
 		{
@@ -358,6 +361,7 @@ function videoService(
 		syncplay,
 		localVideoArtwork,
 		episodeTitles,
+		episodeThumbnails,
 	)
 }
 
@@ -567,6 +571,27 @@ const STREAM_ARTWORK = "https://stream.example/art.jpg"
 describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 	"Presence video artwork while $state",
 	({ state }) => {
+		it("shows an episode thumbnail only when the experimental option is enabled", async () => {
+			const resolve = vi.fn(async () => "https://example.test/episode.jpg")
+			const service = videoService(
+				{ ...SERIES, poster: POSTER },
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				{ resolve },
+			)
+			const video = videoStatus("Breaking.Bad.S02E05.mkv", state)
+
+			expect((await service.getDiscordPresence(video, timeline))?.large_image).toBe(POSTER)
+			expect(resolve).not.toHaveBeenCalled()
+			config.current = { ...BASE_CONFIG, showEpisodeThumbnails: true }
+			expect((await service.getDiscordPresence(video, timeline))?.large_image).toBe(
+				"https://example.test/episode.jpg",
+			)
+			expect(resolve).toHaveBeenCalledTimes(1)
+		})
+
 		it("keeps the fallback rather than a path Discord cannot read", async () => {
 			const presence = await videoService(FILM).getDiscordPresence(
 				videoStatus("The Matrix (1999).mkv", state, LOCAL_VIDEO_ARTWORK),

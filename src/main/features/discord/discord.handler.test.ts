@@ -6,10 +6,13 @@ import type { VlcStatus } from "@shared/vlc/vlc.types"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Client as DiscordClient } from "./discord.client"
 
-const { mockPresenceUpdateInterval, mockHideWhenPaused } = vi.hoisted(() => ({
-	mockPresenceUpdateInterval: { value: 1500 },
-	mockHideWhenPaused: { value: false },
-}))
+const { mockPresenceUpdateInterval, mockHideWhenPaused, mockSpanishTitles, mockThumbnails } =
+	vi.hoisted(() => ({
+		mockPresenceUpdateInterval: { value: 1500 },
+		mockHideWhenPaused: { value: false },
+		mockSpanishTitles: { value: false },
+		mockThumbnails: { value: false },
+	}))
 
 vi.mock("@main/core/logger", () => ({
 	logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
@@ -24,9 +27,13 @@ vi.mock("@main/core/config", () => ({
 				? mockPresenceUpdateInterval.value
 				: key === "hideActivityWhenPaused"
 					? mockHideWhenPaused.value
-					: key === "largeImage"
-						? "vlc_logo"
-						: {},
+					: key === "preferSpanishEpisodeTitles"
+						? mockSpanishTitles.value
+						: key === "showEpisodeThumbnails"
+							? mockThumbnails.value
+							: key === "largeImage"
+								? "vlc_logo"
+								: {},
 		set: () => {},
 		delete: () => {},
 	},
@@ -46,6 +53,8 @@ afterEach(() => {
 	vi.useRealTimers()
 	mockPresenceUpdateInterval.value = 1500
 	mockHideWhenPaused.value = false
+	mockSpanishTitles.value = false
+	mockThumbnails.value = false
 })
 
 import { DiscordRpcHandler } from "./discord.handler"
@@ -306,6 +315,31 @@ describe("DiscordRpcHandler update loop", () => {
 
 		await vi.advanceTimersByTimeAsync(1500)
 		expect(discord.calls.update).toBe(1)
+	})
+
+	it("refreshes the same episode when an experimental setting changes", async () => {
+		vi.useFakeTimers()
+		const discord = fakeDiscord()
+		const video = status({
+			mediaType: "video",
+			media: { title: "Some.Show.S01E03.mkv" },
+		})
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => video),
+			fakePresence(),
+			new FakeClock(),
+		)
+
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(1)
+		mockSpanishTitles.value = true
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(2)
+		mockThumbnails.value = true
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(3)
 	})
 
 	it("resends after forceNextUpdate, even though VLC reports the same thing", async () => {

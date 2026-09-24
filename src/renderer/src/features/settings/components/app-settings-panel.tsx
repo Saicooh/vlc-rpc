@@ -36,12 +36,7 @@ export function AppSettingsPanel({
 	const [startupError, setStartupError] = useState<string | null>(null)
 
 	async function handleToggleOption(
-		option:
-			| "minimizeToTray"
-			| "startWithSystem"
-			| "startMinimized"
-			| "hideActivityWhenPaused"
-			| "preferSpanishEpisodeTitles",
+		option: "minimizeToTray" | "startWithSystem" | "startMinimized" | "hideActivityWhenPaused",
 	): Promise<void> {
 		try {
 			if (option === "startWithSystem") {
@@ -85,18 +80,6 @@ export function AppSettingsPanel({
 						id="hideActivityWhenPaused"
 						checked={config.hideActivityWhenPaused === true}
 						onChange={() => handleToggleOption("hideActivityWhenPaused")}
-					/>
-				}
-			/>
-			<Row
-				htmlFor="preferSpanishEpisodeTitles"
-				label="Prefer Spanish episode titles"
-				description="Use a Spanish episode title when available; fall back to English automatically."
-				control={
-					<Switch
-						id="preferSpanishEpisodeTitles"
-						checked={config.preferSpanishEpisodeTitles === true}
-						onChange={() => handleToggleOption("preferSpanishEpisodeTitles")}
 					/>
 				}
 			/>

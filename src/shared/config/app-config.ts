@@ -31,6 +31,8 @@ export interface AppConfig {
 	hideActivityWhenPaused?: boolean
 	/** Prefer a Spanish episode title when a localized title can be resolved. */
 	preferSpanishEpisodeTitles?: boolean
+	/** Show episode artwork or an uploaded video frame in Discord. */
+	showEpisodeThumbnails?: boolean
 	/** While this stands in the future, the presence is off whatever `rpcEnabled` says. */
 	rpcDisabledUntil?: number
 	/** Optional button shown in the Discord presence. */

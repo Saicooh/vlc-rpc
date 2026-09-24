@@ -8,6 +8,7 @@ import type {
 } from "@main/features/catalog"
 import { parse as parseVideo, takeTrailingSeason } from "@main/features/catalog"
 import type { EpisodeTitleLookup } from "@main/features/catalog/catalog.episode"
+import type { EpisodeThumbnailLookup } from "@main/features/cover/cover.episode"
 import type { CorrectedTags } from "@main/features/overrides"
 import type { AppConfig } from "@shared/config/app-config"
 import type { ResolvedLayout, VideoFacts } from "@shared/presence/layout"
@@ -282,6 +283,7 @@ class PlayingState extends MediaState {
 		private readonly syncplay: SyncplayStatus,
 		private readonly localVideoArtwork: LocalVideoArtwork,
 		private readonly episodeTitles: EpisodeTitleLookup,
+		private readonly episodeThumbnails: EpisodeThumbnailLookup,
 	) {
 		super()
 	}
@@ -320,6 +322,13 @@ class PlayingState extends MediaState {
 		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
 		const externalEpisodeTitle =
 			mediaType === "video" ? await this.episodeTitles.resolve(mediaInfo, catalogResult) : null
+		const episodeThumbnail =
+			config.showEpisodeThumbnails === true &&
+			mediaType === "video" &&
+			localCover?.kind !== "published" &&
+			localCover?.kind !== "publish-failed"
+				? await this.episodeThumbnails.resolve(mediaInfo, catalogResult)
+				: null
 
 		// The artwork first, and the text after it. Both can come from the same
 		// acoustic match, and the lookup that learns it happens inside this call:
@@ -358,6 +367,7 @@ class PlayingState extends MediaState {
 			config.largeImage,
 			cover,
 			localCover?.kind === "published" ? localCover.url : null,
+			episodeThumbnail,
 			localCover?.kind === "publish-failed" ? null : videoCover?.imageUrl,
 			localCover?.kind === "publish-failed" ? null : catalogResult?.poster,
 			media.artworkUrl,
@@ -410,6 +420,7 @@ class PausedState extends MediaState {
 		private readonly syncplay: SyncplayStatus,
 		private readonly localVideoArtwork: LocalVideoArtwork,
 		private readonly episodeTitles: EpisodeTitleLookup,
+		private readonly episodeThumbnails: EpisodeThumbnailLookup,
 	) {
 		super()
 	}
@@ -448,6 +459,13 @@ class PausedState extends MediaState {
 		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
 		const externalEpisodeTitle =
 			mediaType === "video" ? await this.episodeTitles.resolve(mediaInfo, catalogResult) : null
+		const episodeThumbnail =
+			config.showEpisodeThumbnails === true &&
+			mediaType === "video" &&
+			localCover?.kind !== "published" &&
+			localCover?.kind !== "publish-failed"
+				? await this.episodeThumbnails.resolve(mediaInfo, catalogResult)
+				: null
 
 		// The artwork first, and the text after it. Both can come from the same
 		// acoustic match, and the lookup that learns it happens inside this call:
@@ -482,6 +500,7 @@ class PausedState extends MediaState {
 			config.largeImage,
 			cover,
 			localCover?.kind === "published" ? localCover.url : null,
+			episodeThumbnail,
 			localCover?.kind === "publish-failed" ? null : videoCover?.imageUrl,
 			localCover?.kind === "publish-failed" ? null : catalogResult?.poster,
 			media.artworkUrl,
@@ -541,6 +560,7 @@ export class Service {
 		syncplay: SyncplayStatus = NO_SYNCPLAY,
 		localVideoArtwork: LocalVideoArtwork = NO_LOCAL_VIDEO_ARTWORK,
 		episodeTitles: EpisodeTitleLookup = { resolve: async () => null },
+		episodeThumbnails: EpisodeThumbnailLookup = { resolve: async () => null },
 	) {
 		this.states = {
 			stopped: new StoppedState(),
@@ -553,6 +573,7 @@ export class Service {
 				syncplay,
 				localVideoArtwork,
 				episodeTitles,
+				episodeThumbnails,
 			),
 			paused: new PausedState(
 				artwork,
@@ -562,6 +583,7 @@ export class Service {
 				syncplay,
 				localVideoArtwork,
 				episodeTitles,
+				episodeThumbnails,
 			),
 		}
 

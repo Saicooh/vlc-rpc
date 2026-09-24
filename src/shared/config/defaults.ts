@@ -20,6 +20,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	rpcEnabled: true,
 	hideActivityWhenPaused: false,
 	preferSpanishEpisodeTitles: false,
+	showEpisodeThumbnails: false,
 	customButtonEnabled: false,
 	customButtonLabel: "My Profile",
 	customButtonUrl: "",
