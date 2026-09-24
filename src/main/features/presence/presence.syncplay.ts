@@ -1,4 +1,4 @@
-import { exec } from "node:child_process"
+import { execFile } from "node:child_process"
 import { logger } from "@main/core/logger"
 
 export interface SyncplayStatus {
@@ -27,14 +27,15 @@ export class SyncplayDetector implements SyncplayStatus {
 
 	private checkProcess(): Promise<boolean> {
 		return new Promise((resolve) => {
-			const command =
-				process.platform === "win32"
-					? 'tasklist /FI "IMAGENAME eq Syncplay.exe" /NH'
-					: "pgrep -xi syncplay"
+			const windows = process.platform === "win32"
+			const executable = windows ? "tasklist.exe" : "pgrep"
+			const args = windows
+				? ["/FI", "IMAGENAME eq Syncplay.exe", "/FO", "CSV", "/NH"]
+				: ["-xi", "syncplay"]
 
-			exec(command, { timeout: 3000 }, (error, stdout) => {
+			execFile(executable, args, { timeout: 3000 }, (error, stdout) => {
 				if (process.platform === "win32") {
-					resolve(stdout.toLowerCase().includes("syncplay"))
+					resolve(!error && /^"Syncplay\.exe",/im.test(stdout))
 					return
 				}
 
