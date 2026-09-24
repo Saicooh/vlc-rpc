@@ -21,6 +21,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 	hideActivityWhenPaused: false,
 	preferSpanishEpisodeTitles: false,
 	showEpisodeThumbnails: false,
+	episodeFrameChoices: {},
+	interfaceLanguage: "en",
 	customButtonEnabled: false,
 	customButtonLabel: "My Profile",
 	customButtonUrl: "",

@@ -16,19 +16,49 @@ import type { Startup } from "./app.startup"
 import type { Window } from "./app.window"
 
 const TEMPORARY_DISABLES = [
-	{ label: "Disable for 15 minutes", minutes: 15 },
-	{ label: "Disable for 1 hour", minutes: 60 },
-	{ label: "Disable for 2 hours", minutes: 120 },
+	{ label: "disable15", minutes: 15 },
+	{ label: "disable1h", minutes: 60 },
+	{ label: "disable2h", minutes: 120 },
 ] as const
 
-// Built once, at import. The first formatter built in a process pays for the
-// platform's locale data: on Windows that is the host time zone lookup, tens of
-// milliseconds when the machine is idle and unbounded when it is not. This menu
-// is rebuilt every ten seconds for as long as a temporary window runs.
-const UNTIL_TIME = new Intl.DateTimeFormat(undefined, {
-	hour: "2-digit",
-	minute: "2-digit",
-})
+const TRAY_LABELS = {
+	en: {
+		open: "Open VLC Discord RP",
+		minimize: "Minimize to Tray",
+		start: "Start with System",
+		richPresence: "Rich Presence",
+		richPresenceOff: "Rich Presence (off)",
+		richPresenceUntil: "Rich Presence (off until {time})",
+		disable15: "Disable for 15 minutes",
+		disable1h: "Disable for 1 hour",
+		disable2h: "Disable for 2 hours",
+		exit: "Exit",
+	},
+	es: {
+		open: "Abrir VLC Discord RP",
+		minimize: "Minimizar a la bandeja",
+		start: "Iniciar con Windows",
+		richPresence: "Actividad de Discord",
+		richPresenceOff: "Actividad de Discord (desactivada)",
+		richPresenceUntil: "Actividad de Discord (desactivada hasta las {time})",
+		disable15: "Desactivar durante 15 minutos",
+		disable1h: "Desactivar durante 1 hora",
+		disable2h: "Desactivar durante 2 horas",
+		exit: "Salir",
+	},
+} as const
+
+type TrayLanguage = keyof typeof TRAY_LABELS
+const UNTIL_TIME = new Map<TrayLanguage, Intl.DateTimeFormat>()
+
+function formatUntil(language: TrayLanguage, timestamp: number): string {
+	let formatter = UNTIL_TIME.get(language)
+	if (!formatter) {
+		formatter = new Intl.DateTimeFormat(language, { hour: "2-digit", minute: "2-digit" })
+		UNTIL_TIME.set(language, formatter)
+	}
+	return formatter.format(timestamp)
+}
 
 export class Tray {
 	private tray: ElectronTray | null = null
@@ -37,6 +67,7 @@ export class Tray {
 	private readyResolver: (() => void) | null = null
 	private menuUpdateTimer: NodeJS.Timeout | null = null
 	private keepaliveTimer: NodeJS.Timeout | null = null
+	private stopLanguageListener: (() => void) | null = null
 
 	constructor(
 		private readonly startup: Startup,
@@ -84,6 +115,9 @@ export class Tray {
 
 		this.setupTrayKeepalive()
 		this.startMenuUpdateTimer()
+		this.stopLanguageListener = configService.onChange("interfaceLanguage", () =>
+			this.updateContextMenu(),
+		)
 	}
 
 	/**
@@ -103,6 +137,8 @@ export class Tray {
 	public dispose(): void {
 		this.stopTrayKeepalive()
 		this.stopMenuUpdateTimer()
+		this.stopLanguageListener?.()
+		this.stopLanguageListener = null
 
 		if (this.tray) {
 			this.tray.destroy()
@@ -277,15 +313,17 @@ export class Tray {
 
 		try {
 			const config = configService.get()
+			const language = config.interfaceLanguage === "es" ? "es" : "en"
+			const labels = TRAY_LABELS[language]
 
 			const menuItems: MenuItemConstructorOptions[] = [
 				{
-					label: "Open VLC Discord RP",
+					label: labels.open,
 					click: () => this.window?.showWindow(),
 				},
 				{ type: "separator" },
 				{
-					label: "Minimize to Tray",
+					label: labels.minimize,
 					type: "checkbox",
 					checked: config.minimizeToTray,
 					click: () => {
@@ -297,7 +335,7 @@ export class Tray {
 
 			if (this.startup.canStartAtLogin()) {
 				menuItems.push({
-					label: "Start with System",
+					label: labels.start,
 					type: "checkbox",
 					checked: config.startWithSystem,
 					click: () => {
@@ -314,7 +352,7 @@ export class Tray {
 			menuItems.push(
 				{ type: "separator" },
 				{
-					label: this.rpcMenuLabel(rpcEnabled),
+					label: this.rpcMenuLabel(rpcEnabled, language),
 					type: "checkbox",
 					checked: rpcEnabled,
 					click: () => {
@@ -329,7 +367,7 @@ export class Tray {
 				// The three the README has always promised. Issue 30 is someone
 				// reading that page, looking for them here and finding one.
 				...TEMPORARY_DISABLES.map(({ label, minutes }) => ({
-					label,
+					label: labels[label],
 					enabled: rpcEnabled,
 					click: () => {
 						this.discord.disableRpcTemporary(minutes)
@@ -341,7 +379,7 @@ export class Tray {
 			menuItems.push(
 				{ type: "separator" },
 				{
-					label: "Exit",
+					label: labels.exit,
 					click: () => {
 						app.isQuitting = true
 						app.quit()
@@ -361,16 +399,17 @@ export class Tray {
 	 * The on/off answer comes from the client rather than from the flags again,
 	 * so the menu cannot claim one thing while Discord shows another.
 	 */
-	private rpcMenuLabel(enabled: boolean): string {
+	private rpcMenuLabel(enabled: boolean, language: TrayLanguage): string {
+		const labels = TRAY_LABELS[language]
 		if (enabled) {
-			return "Rich Presence"
+			return labels.richPresence
 		}
 
 		const disabledUntil = configService.get("rpcDisabledUntil")
 		if (disabledUntil === undefined) {
-			return "Rich Presence (off)"
+			return labels.richPresenceOff
 		}
 
-		return `Rich Presence (off until ${UNTIL_TIME.format(disabledUntil)})`
+		return labels.richPresenceUntil.replace("{time}", formatUntil(language, disabledUntil))
 	}
 }

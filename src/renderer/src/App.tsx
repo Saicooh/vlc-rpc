@@ -6,9 +6,10 @@ import { LayoutPage } from "@renderer/features/layout"
 import { FirstRunPage } from "@renderer/features/onboarding"
 import { SettingsPage } from "@renderer/features/settings"
 import { useAppInit } from "@renderer/hooks/use-app-init"
+import { useT } from "@renderer/i18n"
 import { cn } from "@renderer/lib/utils"
 import { Titlebar } from "@renderer/shell/titlebar"
-import { isFirstRun } from "@renderer/stores/config.store"
+import { configStore, isFirstRun } from "@renderer/stores/config.store"
 import { useEffect, useState } from "react"
 import { Route, Router, Switch } from "wouter"
 import { useHashLocation } from "wouter/use-hash-location"
@@ -19,11 +20,16 @@ const LOADER_DELAY = 400
 function App(): JSX.Element {
 	const loading = useAppInit()
 	const firstRun = useStore(isFirstRun)
+	const config = useStore(configStore)
+	const t = useT()
 	const [platform, setPlatform] = useState("win32")
 	const [scrolled, setScrolled] = useState(false)
 	const [loaderVisible, setLoaderVisible] = useState(false)
 
 	useDiscordHealth()
+	useEffect(() => {
+		document.documentElement.lang = config?.interfaceLanguage === "es" ? "es" : "en"
+	}, [config?.interfaceLanguage])
 
 	useEffect(() => {
 		window.api.app
@@ -76,7 +82,7 @@ function App(): JSX.Element {
 					)}
 				>
 					<img src={logo} alt="" className="size-8" />
-					<p className="type-caption text-muted-foreground">Starting</p>
+					<p className="type-caption text-muted-foreground">{t("Starting")}</p>
 				</div>
 			</div>
 		)
@@ -103,8 +109,10 @@ function App(): JSX.Element {
 							<Route path="/layout" component={LayoutPage} />
 							<Route path="/settings" component={SettingsPage} />
 							<Route>
-								<h2 className="type-hero text-strong">Not found</h2>
-								<p className="type-body mt-2 text-muted-foreground">That page does not exist.</p>
+								<h2 className="type-hero text-strong">{t("Not found")}</h2>
+								<p className="type-body mt-2 text-muted-foreground">
+									{t("That page does not exist.")}
+								</p>
 							</Route>
 						</Switch>
 					</div>

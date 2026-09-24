@@ -8,6 +8,7 @@ import { logger } from "./logger"
 class ConfigService {
 	private static instance: ConfigService | null = null
 	private conf: Conf<AppConfig>
+	private readonly listeners = new Map<keyof AppConfig, Set<() => void>>()
 
 	private constructor() {
 		this.conf = new Conf<AppConfig>({
@@ -39,6 +40,7 @@ class ConfigService {
 			this.conf.set(key, value)
 			// The value stays out of the log: config holds the VLC http password.
 			logger.info(`Config updated: ${key}`)
+			this.notifyChange(key as keyof AppConfig)
 			return true
 		})
 	}
@@ -56,11 +58,27 @@ class ConfigService {
 		this.conf.set(key, value)
 		// The value stays out of the log: config holds the VLC http password.
 		logger.info(`Config updated: ${key}`)
+		this.notifyChange(key)
+	}
+
+	public onChange(key: keyof AppConfig, listener: () => void): () => void {
+		const listeners = this.listeners.get(key) ?? new Set<() => void>()
+		listeners.add(listener)
+		this.listeners.set(key, listeners)
+		return () => {
+			listeners.delete(listener)
+			if (listeners.size === 0) this.listeners.delete(key)
+		}
+	}
+
+	private notifyChange(key: keyof AppConfig): void {
+		for (const listener of this.listeners.get(key) ?? []) listener()
 	}
 
 	public delete<K extends keyof AppConfig>(key: K): void {
 		this.conf.delete(key)
 		logger.info(`Config deleted: ${key}`)
+		this.notifyChange(key)
 	}
 }
 

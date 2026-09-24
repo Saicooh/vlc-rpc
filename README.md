@@ -126,6 +126,10 @@ The app lives in the system tray, and closing the window does not quit it. Right
 icon to turn Rich Presence off, or to turn it off for 15 minutes, an hour, or two hours, which is
 what you want when you are watching something you would rather not broadcast.
 
+Choose **English** or **Español** under Settings → App → Interface language. This changes the
+window and tray labels immediately. The preference for Spanish episode titles in Discord is a
+separate setting.
+
 An installed copy can start with Windows. Those launches start in the tray when "Keep running in
 the tray" is enabled; opening the app yourself shows the window. To keep the window hidden on
 every launch, turn on "Start in the tray" in Settings or pass `--start-minimized` on the command
