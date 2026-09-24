@@ -44,6 +44,16 @@ describe("parse, fansub naming", () => {
 })
 
 describe("parse, bare season markers the library does not read", () => {
+	it("reads an episode after an explicit season in an Erai-raws release", () => {
+		const result = parse(
+			"[Erai-raws] Uma Musume - Pretty Derby Season 3 - 04 [1080p][Multiple Subtitle][173E422F]",
+		)
+		expect(result.title).toBe("Uma Musume - Pretty Derby")
+		expect(result.season).toBe(3)
+		expect(result.episode).toBe(4)
+		expect(result.subtitle).toBeUndefined()
+	})
+
 	it("reads a bare S2 suffix as the season", () => {
 		const result = parse(
 			"[ASW] Otome Game Sekai wa Mob ni Kibishii Sekai desu S2 - 11 [1080p HEVC x265 10Bit][AAC]",

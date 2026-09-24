@@ -394,6 +394,24 @@ describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 			expect(presence?.state).toBe("S2E5")
 		})
 
+		it("removes a redundant ordinal season suffix from the displayed show title", async () => {
+			const presence = await videoService({
+				...SERIES,
+				title: "Re Zero kara Hajimeru Isekai Seikatsu 4th Season",
+				season: 4,
+				episode: 17,
+			}).getDiscordPresence(
+				videoStatus(
+					"[Erai-raws] Re Zero kara Hajimeru Isekai Seikatsu 4th Season - 17 [1080p CR WEBRip HEVC AAC][MultiSub][A8F9762F].mkv",
+					state,
+				),
+				timeline,
+			)
+
+			expect(presence?.details).toBe("Re Zero kara Hajimeru Isekai Seikatsu")
+			expect(presence?.state).toBe("S4E17")
+		})
+
 		it("shows a verified external episode title when the file has only a number", async () => {
 			const presence = await videoService(SERIES, undefined, undefined, undefined, {
 				resolve: async () => "The Long Night",

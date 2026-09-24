@@ -39,7 +39,7 @@ function classifySignal(filename: string): ParsedVideo["signal"] {
 
 // Only a marker at the very end is a season: in the middle it belongs to the
 // title, as in "Made in Abyss Season 2 The Golden City".
-function takeTrailingSeason(title: string): { season: number; title: string } | undefined {
+export function takeTrailingSeason(title: string): { season: number; title: string } | undefined {
 	const match = title.match(TRAILING_SEASON)
 	if (!match) return undefined
 

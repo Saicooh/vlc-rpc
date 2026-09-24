@@ -98,6 +98,14 @@ describe("pickBest, weighted signals among gate survivors", () => {
 })
 
 describe("pickBest, season as a signal between candidates", () => {
+	it("identifies season 3 of Uma Musume from its Erai-raws filename", () => {
+		const file = parsed({ title: "Uma Musume - Pretty Derby", season: 3, episode: 4 })
+		const firstSeason = candidate({ id: "98514", title: "Uma Musume: Pretty Derby" })
+		const thirdSeason = candidate({ id: "156632", title: "Uma Musume: Pretty Derby Season 3" })
+
+		expect(pickBest(file, [firstSeason, thirdSeason])?.id).toBe("156632")
+	})
+
 	// Real AniList entries for the query "Yoroi-Shinden Samurai Troopers".
 	// AniList models each season as a separate entry with the season in the
 	// title, so searching the title the parser stripped returns the whole

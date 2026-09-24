@@ -1,6 +1,6 @@
 export { AniListProvider } from "./catalog.anilist"
 export { Cache } from "./catalog.cache"
 export { EpisodeTitleResolver } from "./catalog.episode"
-export { parse } from "./catalog.parser"
+export { parse, takeTrailingSeason } from "./catalog.parser"
 export { Resolver } from "./catalog.resolver"
 export type { Candidate, CatalogResult, ParsedVideo } from "./catalog.types"

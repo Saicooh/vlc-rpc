@@ -6,7 +6,7 @@ import type {
 	CatalogResult,
 	ParsedVideo,
 } from "@main/features/catalog"
-import { parse as parseVideo } from "@main/features/catalog"
+import { parse as parseVideo, takeTrailingSeason } from "@main/features/catalog"
 import type { EpisodeTitleLookup } from "@main/features/catalog/catalog.episode"
 import type { CorrectedTags } from "@main/features/overrides"
 import type { AppConfig } from "@shared/config/app-config"
@@ -99,7 +99,10 @@ function videoFacts(
 			localParse?.season !== undefined ||
 			localParse?.episode !== undefined
 
-	const title =
+	const season = isTvShow
+		? (media.season ?? catalogResult?.season ?? localParse?.season)
+		: undefined
+	const rawTitle =
 		firstNonEmpty(
 			catalogResult?.title,
 			canonicalTitle ?? undefined,
@@ -107,6 +110,9 @@ function videoFacts(
 			localParse?.title,
 			media.title,
 		) ?? ""
+	const trailingSeason = takeTrailingSeason(rawTitle)
+	const title =
+		season !== undefined && trailingSeason?.season === season ? trailingSeason.title : rawTitle
 	const subtitle = firstNonEmpty(
 		media.episodeTitle,
 		localParse?.subtitle,
@@ -121,7 +127,7 @@ function videoFacts(
 		title: !isTvShow && distinctSubtitle ? `${title}: ${distinctSubtitle}` : title,
 		episodeTitle: isTvShow ? distinctSubtitle : undefined,
 		// A film whose filename happens to parse a season must not grow an episode.
-		season: isTvShow ? (media.season ?? catalogResult?.season ?? localParse?.season) : undefined,
+		season,
 		episode: isTvShow
 			? (media.episode ?? catalogResult?.episode ?? localParse?.episode)
 			: undefined,
