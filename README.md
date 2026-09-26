@@ -2,334 +2,70 @@
 
 [![Windows](https://img.shields.io/badge/Windows-0078d4?style=flat&logo=windows&logoColor=white)](https://github.com/Saicooh/vlc-rpc/releases)
 [![Release](https://img.shields.io/github/v/release/Saicooh/vlc-rpc?style=flat)](https://github.com/Saicooh/vlc-rpc/releases)
-[![Downloads](https://img.shields.io/github/downloads/Saicooh/vlc-rpc/total?style=flat)](https://github.com/Saicooh/vlc-rpc/releases)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat)](LICENSE-CODE)
 
-Shows what you are playing in VLC on your Discord profile, with the cover art when it can find one.
-
-## Saicooh fork additions
-
-This fork keeps the upstream VLC Discord RP foundation and adds a more capable video catalog and
-presence pipeline:
-
-- **Anime-aware filename parsing.** Handles release groups, `SxxExx` seasons and episodes, absolute
-  episode numbers, subtitles, years, underscores, and release descriptors such as `Movie`, `SP`,
-  `OVA`, and `ONA`.
-- **Stronger AniList matching.** Uses title aliases, subtitle-aware search candidates, release-name
-  cleanup, and safer scoring so common fansub names resolve to the right anime.
-- **Western TV metadata.** Series that AniList does not contain can use TVMaze for a canonical title,
-  poster, and source link. Wikipedia page images back up films and series without a catalog poster.
-- **Video source buttons.** Resolved videos can expose links to AniList, TVMaze, or Wikipedia in Discord.
-  The optional custom profile button is shown for AniList-identified anime, not unrelated western TV.
-- **Syncplay presence.** Detects an active Syncplay session and changes the Discord presence indicator
-  to show that playback is shared.
-- **Better VLC metadata handling.** Keeps VLC's real filename separate from its display title, which
-  makes catalog parsing reliable even when VLC reports a shortened or cleaned title.
-- **Episode names in Discord.** The presence shows the episode title beside its number when the
-  file name or VLC tags provide it. Otherwise it looks up a matching episode in JustWatch, TVMaze,
-  or AniList when available. If it cannot find a reliable match, it keeps the number.
-- **Spanish episode title preference.** An option in Settings to prefer Spanish episode titles when
-  resolving through JustWatch, automatically falling back to English.
-- **Episode thumbnails and frame capture.** Optional setting to display TVMaze episode artwork or
-  capture an exact frame from the local playing video via VLC and upload it for Discord presence.
-- **Interface language.** Full interface support in both English and Spanish, selectable in Settings.
-- **Blu-Ray & Radio playback.** Recognizes Blu-Ray media structures, exposing disc title and
-  chapter numbers in the layout builder, alongside clean presence for live radio streams.
-
-The upstream project is [VLC Discord RP](https://github.com/valentin-marquez/vlc-rpc). This fork is
-published at [Saicooh/vlc-rpc](https://github.com/Saicooh/vlc-rpc).
-
-VLC already exposes everything it knows over a local HTTP interface. This app reads that, works out
-what the file actually is, looks for artwork, and hands the result to Discord. The interesting part
-is the middle step, because a file on disk is usually called something like
-`[SubsPlease] Frieren - 11 (1080p) [A1B2C3D4].mkv`, and nobody wants that on their profile.
+Show what you are playing in VLC on your Discord profile, with artwork when available. This is a fork of [VLC Discord RP](https://github.com/valentin-marquez/vlc-rpc).
 
 | Music | Anime | Paused |
 | --- | --- | --- |
 | ![Music](docs/music%20detection.png) | ![Anime](docs/anime%20detection.png) | ![Paused](docs/paused%20detection.png) |
 
-## How it works
+## Fork additions
 
-```mermaid
-graph LR
-    A[VLC Media Player] -->|HTTP interface| B[VLC Discord RP]
-    B -->|filename and tags| D[Identification]
-    D -->|title, season, episode| B
-    D -->|cover art lookup| E[AniList / TVMaze / Wikipedia / iTunes / MusicBrainz]
-    B -->|Rich Presence| C[Discord]
-```
+- **Better anime matching:** Parses release groups, episode numbers, and subtitles from filenames, then uses AniList aliases to find the right title.
+- **More video sources:** Uses TVMaze for western TV and Wikipedia images when a catalog has no poster. Resolved videos can link to their source from Discord.
+- **Episode details:** Shows episode names when available, with an option to prefer Spanish titles. Optional thumbnails can come from TVMaze or a frame captured from the playing video.
+- **Shared playback:** Detects Syncplay sessions and marks the Discord presence as shared.
+- **More VLC media support:** Uses the real filename even when VLC shows a different title, recognizes Blu-Ray titles and chapters, and handles live radio streams.
+- **Bilingual interface:** Switch between English and Spanish in Settings.
 
-The app polls VLC's status endpoint roughly every 1.5 seconds. When something is playing it reads
-the file's tags and parses its name, then decides whether it is looking at a series, a film, or a
-track. From there it tries to find a cover, and sends Discord a presence built from what it found.
+## Install and first run
 
-It only sends an update when something meaningful changed. Playback position alone does not count,
-because Discord animates the progress bar on its own from the start and end timestamps.
+Download the installer or portable build from [Releases](https://github.com/Saicooh/vlc-rpc/releases). Published builds are for 64-bit Windows 10 and 11.
 
-## Where the artwork comes from
+You also need VLC and the Discord desktop app. In Discord, enable **Settings → Activity Privacy → Display current activity as a status message**. Rich Presence does not work through Discord in a browser.
 
-The app tries sources in order and stops at the first confident match. It would rather show no
-cover than the wrong one, so a weak match is discarded.
+On first run, the app helps you enable VLC's HTTP interface. **Close VLC before setup and reopen it afterward** so VLC reads the new settings. The app uses a password to connect to VLC on your own computer. If port 9080 is already in use, change it in the app's Settings while VLC is closed, then reopen VLC.
 
-| Content | Source | Needs an account |
-| --- | --- | --- |
-| Audio or video with local cover art | The file itself, uploaded for Discord | No |
-| Audio with usable tags | iTunes Search, then MusicBrainz and the Cover Art Archive | No |
-| Audio with no usable tags | The sound itself, see below | No |
-| Anime | AniList | No |
-| Western television | TVMaze, then Wikipedia page image | No |
-| Films | AniList for anime films, then Wikipedia page image | No |
-| Episode thumbnails (optional) | TVMaze episode artwork or local video frame capture | No |
+The installer can start with Windows. The portable build runs from any folder and keeps its settings in your user profile. An internet connection is needed for artwork, episode lookups, and updates; VLC playback information is read locally.
 
-A file ripped from YouTube usually has no artist and a title that is really its
-filename, so no text search can find it. For those the app computes an acoustic
-fingerprint of the audio and asks AcoustID which recording it is, which does not
-care what the file is called. When the match is strong enough it supplies the
-title and the artist as well, so Discord reads the song and not the file. Naming
-asks for more confidence than artwork does, so a match can be good enough for the
-cover and still leave the text as it was. That step runs last, only for what
-nothing else could identify, because its usage budget is shared by everyone
-running the app rather than being yours alone. You do not need an account for it.
+## Using the app
 
-Artwork embedded in an audio file cannot be handed to Discord directly, because Discord fetches
-images by URL and knows nothing about your disk. The app uploads that image to a temporary public
-file host so Discord can reach it. Read the Limitations section before you decide how you feel
-about that.
+The app stays in the system tray when you close its window. Right click the tray icon to turn Rich Presence off or pause it temporarily.
 
-## Requirements
+Use **Layout** to arrange the fields on your Discord card. Music and video have separate layouts. If the app identifies something incorrectly, open **Correction** on Home to change its title or artwork, then manage saved corrections in Settings. Video also has **Retry lookup** to check the catalogs again.
 
-- Windows 10 or 11, 64 bit. These are the only builds published.
-- VLC Media Player, with its HTTP interface, which the app turns on for you.
-- The Discord desktop app, running. Rich Presence does not work through Discord in a browser.
-- In Discord, under Settings, Activity Privacy, "Display current activity as a status message"
-  must be on.
+The app checks for new releases. Installed copies can download an update; portable copies open the release page.
 
-An internet connection is needed for cover art and episode title lookups, and for updates. Playback
-information from VLC remains local.
+## Artwork and privacy
 
-## Installing
+The app first checks local artwork and media tags, then searches public catalogs. Audio without useful tags can be identified by an acoustic fingerprint through AcoustID. Uncertain matches may keep the filename or show no cover rather than display the wrong title or image.
 
-Take a build from [Releases](https://github.com/Saicooh/vlc-rpc/releases).
+**Local artwork and selected video frames are uploaded to a public image host so Discord can display them.** Anyone with the resulting link can view the image while the host keeps it. The app uploads the image under a generated name, without your media filename or path. Uploaded images may expire, so a cover can disappear until you play the file again. You can use a correction with an existing web image instead of uploading local artwork.
 
-`vlc-rpc-x.x.x-setup.exe` installs normally and can start with Windows.
-`vlc-rpc-x.x.x-portable.exe` runs from wherever you put it, and still keeps its configuration in
-your user profile.
-
-## First run
-
-VLC's HTTP interface is off by default, so the app walks you through turning it on. It writes the
-port and a password into VLC's own configuration file, `vlcrc`.
-
-**Close VLC before setup, then open it again afterward.** The app checks whether VLC is running
-before it changes `vlcrc`, because VLC can overwrite those changes when it closes. If VLC is open,
-setup asks you to close it and try again.
-
-The default port is 9080. If something else on your machine is already using it, change it in
-Settings while VLC is closed, then open VLC again. The password is generated if you leave it empty, and it is only
-ever used to talk to VLC on your own machine.
-
-## Using it
-
-The app lives in the system tray, and closing the window does not quit it. Right click the tray
-icon to turn Rich Presence off, or to turn it off for 15 minutes, an hour, or two hours, which is
-what you want when you are watching something you would rather not broadcast.
-
-Choose **English** or **Español** under Settings → App → Interface language. This changes the
-window and tray labels immediately. The preference for Spanish episode titles in Discord is a
-separate setting.
-
-An installed copy can start with Windows. Those launches start in the tray when "Keep running in
-the tray" is enabled; opening the app yourself shows the window. To keep the window hidden on
-every launch, turn on "Start in the tray" in Settings or pass `--start-minimized` on the command
-line. If the tray is unavailable, the window opens so the app remains accessible.
-
-A new release announces itself with a button in the window header, next to the VLC and Discord
-chips, and there is nothing there the rest of the time, so an empty header means you are current.
-If the app cannot tell whether this copy came from the installer, it says so in About and uses
-manual updates until the installation can be identified.
-An installed copy reads "Update to 5.2.0", downloads it and restarts to finish. A portable copy
-reads "Get 5.2.0" and opens the release page, because a portable build cannot replace the file it
-is running from. While it downloads, the button becomes the version and the percent. If you would
-rather ask than wait, Settings has a "Check for updates" button under About, which answers next to
-the version it checked.
-
-**Layout** is where you build what your profile shows. On the left is a palette of pieces named the
-way you would name them: Title, Artist, Album, your own words, and for video Title, Episode, Year,
-Season number and Episode number, each one showing what it is worth for the file playing right now.
-On the right is the Discord card, the same one Home draws, and its lines are where the pieces go.
-Drag a piece onto a line, or pick a line and press a piece; a piece already placed moves with the
-arrow keys and comes off with delete. There is no preview beside it, because the card you arrange
-is the card your profile draws. Music and video are arranged separately.
-
-The lines are Discord's own, in the order it draws them: the header, where the verb and the name of
-the activity share one line, then the bold line, then the line under it, then the text on the
-artwork. Left empty, the header is Discord's to fill, and it writes the name of the app there, the
-way a Spotify card reads. Video has only the bold line and the one under it. A piece with nothing
-to draw takes itself off the line and takes the words beside it with it, which is how one
-arrangement reads for a series and for a film without writing "Unknown" or leaving empty brackets
-behind. The builder warns you when two lines would draw the same value, and when a line holds
-pieces but draws nothing in any of the examples.
-
-**Corrections** are for when the app gets it wrong, or when there is no source to get it right
-from. On Home, the "Correction" row of "What VLC reports" opens a small form already filled in with
-what the app worked out. For video you can change the title, the cover, and whether it is a film or
-a series. For audio that carries tags you can change only the cover, because the text is built from
-those tags. For audio whose tags name nothing you can type the title and the artist too, and there
-the cover is optional: once the track has a name, the ordinary lookup usually finds the artwork by
-itself. A cover is a web address, and saving checks that it really loads before keeping it.
-
-When a file was named from its sound rather than from its tags, the "Audio match" row says so, with
-a button to go back to what the file says. That refusal is saved as a correction like any other,
-and the same row takes it back.
-
-A correction always wins. It is not weighed against anything and it is never scored, and the cover
-you give it for audio also beats the artwork embedded in the file. That last part matters more than
-it sounds, because a wrong or low resolution cover baked into an MP3 is the most common reason to
-want a correction in the first place.
-
-Saved corrections are listed in Settings, where you can see what each one applies to and remove it.
-
-For video, Home shows where the title, episode name, and image came from. Use **Retry lookup** to
-check the catalogs again without removing a correction. With episode thumbnails enabled, a local
-episode also offers **Preview frames** at 20%, 40%, and 60% of the video. The previews stay on your
-PC; choosing one uploads that frame for Discord. **Use automatic image** restores the usual
-artwork choice.
-
-## Limitations
-
-These are real, and worth knowing before you file a bug.
-
-**Non-anime video lookups are best effort.** TVMaze provides public metadata and posters for many
-western series without credentials. Films and series that TVMaze cannot identify fall back to a
-poster from an exact Wikipedia film or TV page. A correction is still the
-reliable answer when a title has an unusual name or the public sources disagree.
-
-**Blu-Ray discs:** The app reads the playing URI from VLC's playlist. For a named rip folder it
-uses the folder title; it also makes VLC's title and chapter numbers available as video layout
-pieces. A drive root or product code does not identify the film reliably, so the app leaves that
-label alone and lets you save a correction with the film title and poster. Playback times still
-come from VLC.
-
-**Embedded cover art is uploaded to a public file host.** To show the artwork inside your media
-files, the app tries up to five public hosts at once (x0.at, catbox.moe, uguu.se, 0x0.st,
-tempfile.org) and gives Discord the first link that comes back. The uploads still in flight
-are cancelled when one host answers, and unanswered uploads time out after 15 seconds. A failed
-host is skipped briefly on later attempts, but a host that finished first has a copy of its own.
-Anyone holding one of those links can open the image for as long as it lives. The app requests
-expiry where the host supports it; other hosts decide how long to keep the image. Only the image
-goes up, under a generated name like `cover_1757980800000.jpg`,
-so neither your filename nor its path travels with it. If you would rather not, leave Rich Presence
-off for those files, or point a correction at an image that is already on the web, which is handed
-to Discord as a link and uploads nothing.
-
-**A correction is tied to what the app matched, not to the file you were playing.** A video
-correction is filed against the title read out of the filename, so the same series under two
-release names counts as two different things and a correction saved for one will not apply to the
-other. An audio correction is filed against the artist and the record its tags name, so it covers
-the whole album at once. Audio with no tags has nothing to be filed against except the file itself,
-so that correction ends the day the file is moved or renamed. Settings spells out what each one
-applies to, so you can see why one stopped working instead of guessing.
-
-**VLC has to be closed before the initial setup** and before changes to the port or password. Open
-it afterward, because VLC only reads `vlcrc` at startup.
-
-**Identification is confidence based and prefers silence.** If nothing scores well enough you get
-the filename and no cover, rather than a confident guess at the wrong show. Replacing the text
-takes a better score than showing a cover does, so a file identified by its sound can end up with
-the right artwork and still read as its filename.
-
-**Windows only, as published.** The core has no Windows specific logic, but no macOS or Linux
-builds are produced or tested.
-
-## Technical notes
-
-Electron with TypeScript throughout, React in the renderer, built with electron-vite, linted and
-formatted with Biome, tested with Vitest. The package manager is Bun 1.4.2.
-
-The main process is organised by feature rather than by layer. Each folder under
-`src/main/features/` owns its own types, handlers and services, and `src/main/main.ts` is a
-composition root that builds the object graph by hand. There is no dependency injection framework
-and there are no singletons: everything arrives through a constructor, which is what lets the test
-suite run with no VLC, no Discord and no network.
-
-```
-src/main/       main.ts, core/ (logger, config, ipc, clock), features/<name>/
-src/preload/    the only bridge between main and renderer
-src/renderer/   React, also organised by feature
-src/shared/     the contract between main and renderer, and nothing else
-```
-
-`src/shared/ipc/channels.ts` is the single source of truth for every IPC channel. Adding one there
-makes the compiler demand both the handler in main and the bridge in preload, so the two halves
-cannot drift apart quietly.
-
-Identification lives in `features/catalog` for video and `features/music` for audio. Both follow
-the same shape: parse, build a cache key, ask the providers, score the candidates, and return a
-result only above a threshold. Scoring uses Sorensen-Dice bigram similarity over normalised titles.
-Results are cached to disk, so replaying the same album does not repeat the lookups.
-
-Running it locally:
-
-```bash
-bun install
-bun run dev        # electron-vite in watch mode
-bun run test       # vitest, needs no VLC and no network
-bun run typecheck  # main and renderer
-bun run lint       # biome, writes fixes
-bun run build      # typecheck, then bundle
-bun run build:win  # installer and portable executable in dist/
-```
-
-`bun run build` does not replace an installed copy. Run `bun run dev` to try the source directly,
-or install the new build from `dist/` after `bun run build:win`.
-
-Audio fingerprinting needs two things a clone does not have. `bun install` fetches
-Chromaprint's `fpcalc` for your platform into `resources/bin/`, which is git ignored, and the
-AcoustID client key is read at build time from `MAIN_VITE_ACOUSTID_KEY`. Copy `.env.example` to
-`.env` and put your own key there if you want that step to run; see
-[acoustid.org/new-application](https://acoustid.org/new-application). Without a key the app skips
-it and everything else behaves exactly as it does in a release.
-
-[CONTRIBUTING.md](CONTRIBUTING.md) documents the conventions the codebase actually follows,
-including file naming, the barrel rules, and the logging rules that keep your VLC password out of
-the log file. Read it before writing code.
+Corrections have different scopes: a video correction follows the title parsed from its filename, tagged audio corrections apply to the album, and corrections for untagged audio follow the file. Moving or renaming an untagged file can therefore make its correction stop applying.
 
 ## Troubleshooting
 
-**Nothing appears on Discord.** Check that the Discord desktop app is open, and that "Display
-current activity as a status message" is on under Settings, Activity Privacy. Discord also hides
-your own activity in some views, so it is worth asking someone else before concluding it is broken.
+- **Nothing appears on Discord:** Check that the desktop app is open and activity sharing is enabled in Discord's privacy settings.
+- **The app cannot reach VLC:** Restart VLC. If that does not help, check the port in the app's Settings and VLC's `vlcrc` file.
+- **A title or cover is wrong:** Save a correction. For a repeatable identification bug, [open an issue](https://github.com/Saicooh/vlc-rpc/issues) with the exact filename.
+- **An uploaded cover disappeared:** Temporary image hosts can expire uploads. Playing the file again uploads its artwork again.
 
-**The app says it cannot reach VLC.** Restart VLC. This is almost always the first run case, where
-the settings were written but VLC has not read them yet. If it persists, check that the port in
-Settings matches the one in `vlcrc`, and that nothing else is using it.
+## Development
 
-**A show is identified as the wrong one.** Use a correction. If it happens with a common release
-naming pattern, an issue with the exact filename is genuinely useful.
-
-**The cover disappeared after a while.** Uploaded artwork lives on a temporary host and expires.
-Playing the file again uploads it again.
-
-## Contributing
-
-Fork, branch, and open a pull request. Add a changeset for anything a user would notice:
+The app uses Electron, React, and TypeScript. Bun 1.4.2 is the package manager.
 
 ```bash
-bun changeset
+bun install
+bun run dev
+bun run test
+bun run typecheck
+bun run build:win
 ```
 
-See [.changeset/CONTRIBUTING.md](.changeset/CONTRIBUTING.md) for what goes in one, and
-[CONTRIBUTING.md](CONTRIBUTING.md) for the code conventions.
+Audio fingerprinting in a local build requires an AcoustID key in `MAIN_VITE_ACOUSTID_KEY`; see [.env.example](.env.example). Without it, that lookup is skipped. See [CONTRIBUTING.md](CONTRIBUTING.md) for code conventions and [docs/CHANGESETS.md](docs/CHANGESETS.md) for changesets.
 
-## License
+## License and support
 
-AGPL-3.0. See [LICENSE-CODE](LICENSE-CODE).
-
-## Support
-
-Bugs and feature requests go to [Issues](https://github.com/Saicooh/vlc-rpc/issues). For
-an identification bug, include the exact filename, since that is what the app reads.
-
-If you want to support the project:
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/nozzdev)
+Licensed under [AGPL-3.0](LICENSE-CODE). Report bugs and request features in [Issues](https://github.com/Saicooh/vlc-rpc/issues).
