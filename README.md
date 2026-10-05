@@ -12,7 +12,7 @@ Show what you are playing in VLC on your Discord profile, with artwork when avai
 
 ## Fork additions
 
-- **Better anime matching:** Parses release groups, episode numbers, and subtitles from filenames, then uses AniList aliases to find the right title.
+- **Better anime matching:** Parses episode numbers and subtitles from filenames, including names without release-group tags. Uses AniList aliases and a targeted sequel search when the requested season is missing. Posters are cached separately by season and arc.
 - **More video sources:** Uses TVMaze for western TV and Wikipedia images when a catalog has no poster. Resolved videos can link to their source from Discord.
 - **Episode details:** Shows episode names when available, with an option to prefer Spanish titles. Optional thumbnails can come from TVMaze or a frame captured from the playing video.
 - **Shared playback:** Detects Syncplay sessions and marks the Discord presence as shared.
@@ -40,6 +40,8 @@ The app checks for new releases. Installed copies can download an update; portab
 ## Artwork and privacy
 
 The app first checks local artwork and media tags, then searches public catalogs. Audio without useful tags can be identified by an acoustic fingerprint through AcoustID. Uncertain matches may keep the filename or show no cover rather than display the wrong title or image.
+
+Music searches ignore explicit edition labels such as `(Remastered 2011)` while preserving live and remix titles and checking the artist. Video matching still requires a close title or alias match; a season search cannot turn an unrelated result into a match. If no catalog entry identifies a sequel separately, the existing franchise fallback remains available.
 
 **Local artwork and selected video frames are uploaded to a public image host so Discord can display them.** Anyone with the resulting link can view the image while the host keeps it. The app uploads the image under a generated name, without your media filename or path. Uploaded images may expire, so a cover can disappear until you play the file again. You can use a correction with an existing web image instead of uploading local artwork.
 

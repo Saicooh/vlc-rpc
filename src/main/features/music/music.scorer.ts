@@ -1,4 +1,5 @@
 import { diceSimilarity, normalize } from "@main/core/similarity"
+import { recordingTitle } from "./music.title"
 import type {
 	FingerprintMatch,
 	Identification,
@@ -112,7 +113,7 @@ export function pickBest(
 	candidates: RecordingCandidate[],
 ): RecordingCandidate | null {
 	const wantedArtists = normalizedNames(query.artists)
-	const wantedTitle = normalize(query.title)
+	const wantedTitle = normalize(recordingTitle(query.title))
 
 	let best: RecordingCandidate | null = null
 	let bestScore = -1
@@ -121,7 +122,7 @@ export function pickBest(
 		const creditedArtists = normalizedNames(candidate.artists)
 		if (!isCredited(wantedArtists, creditedArtists)) continue
 
-		const candidateTitle = normalize(candidate.title)
+		const candidateTitle = normalize(recordingTitle(candidate.title))
 		if (!matches(wantedTitle, candidateTitle)) continue
 
 		const score =

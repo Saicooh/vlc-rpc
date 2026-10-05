@@ -7,8 +7,9 @@ import type { CacheEntry, IdentifiedName, MusicResult, UnresolvedReason } from "
 // music lookup, and vice versa. Bump it whenever an entry gains a field the
 // reader would otherwise have to guess at, since a resolved entry never
 // expires: 2 added the reason behind a miss, 3 the name an acoustic match
-// identified. Exported so a test double stamps the number the real one does.
-export const CACHE_VERSION = 3
+// identified, 4 retries misses using the remaster-label matcher. Exported so
+// a test double stamps the number the real one does.
+export const CACHE_VERSION = 4
 const MAX_RESOLVED_ENTRIES = 200
 const TRANSIENT_TTL_MS = 5_000
 const STABLE_TTL_MS = 24 * 60 * 60_000

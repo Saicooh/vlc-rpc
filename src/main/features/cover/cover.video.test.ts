@@ -1,4 +1,4 @@
-import type { Candidate, CatalogResult } from "@main/features/catalog"
+import type { Candidate, CatalogResult, ParsedVideo } from "@main/features/catalog"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { VideoResolver } from "./cover.video"
@@ -38,6 +38,41 @@ function anilistResult(overrides: Partial<Candidate> = {}): Candidate {
 }
 
 describe("VideoResolver", () => {
+	it("keeps posters for different seasons apart and forwards their context", async () => {
+		const searchBest = vi.fn(async (_title: string, context?: ParsedVideo) =>
+			anilistResult({
+				title: `Overlord ${context?.season}`,
+				mediaKind: "tv",
+				posterUrl: `https://example.test/${context?.season}.jpg`,
+			}),
+		)
+		const resolver = new VideoResolver({ searchBest })
+		expect((await resolver.resolve(status("Overlord.S01E01.mkv"))).imageUrl).toBe(
+			"https://example.test/1.jpg",
+		)
+		expect((await resolver.resolve(status("Overlord.S02E01.mkv"))).imageUrl).toBe(
+			"https://example.test/2.jpg",
+		)
+		expect((await resolver.resolve(status("Overlord.S01E02.mkv"))).imageUrl).toBe(
+			"https://example.test/1.jpg",
+		)
+		expect(searchBest).toHaveBeenCalledTimes(2)
+	})
+
+	it("prefers a new catalog poster over an earlier cached guess", async () => {
+		const resolver = new VideoResolver({ searchBest: async () => anilistResult() })
+		const file = status("The.Matrix.1999.mkv")
+		await resolver.resolve(file)
+		expect(
+			(
+				await resolver.resolve(file, {
+					title: "Corrected title",
+					poster: "https://example.test/correct.jpg",
+					mediaKind: "movie",
+				})
+			).imageUrl,
+		).toBe("https://example.test/correct.jpg")
+	})
 	it("does not search an opaque Blu-Ray volume code", async () => {
 		const searchBest = vi.fn(async () => anilistResult())
 		const fetch = vi.fn()

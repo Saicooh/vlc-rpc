@@ -18,6 +18,7 @@ import {
 	overrideCoversTrack,
 } from "./music.key"
 import { albumMatches, pickBest } from "./music.scorer"
+import { recordingTitle } from "./music.title"
 import type {
 	AudioFileIdentity,
 	AudioIdentifier,
@@ -478,7 +479,8 @@ export class Resolver {
 	/** A miss carries its reason out, because what follows it depends on it. */
 	private async resolveByTags(query: TrackQuery): Promise<StepOutcome> {
 		const key = musicKey(query)
-		return await this.once(key, () => this.resolveUncached(query, key))
+		const searchable = { ...query, title: recordingTitle(query.title) }
+		return await this.once(key, () => this.resolveUncached(searchable, key))
 	}
 
 	/** Cached with the reason it happened, and answered with the same one. */

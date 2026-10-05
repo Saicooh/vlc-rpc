@@ -81,7 +81,18 @@ export class VideoResolver {
 		const parsed = parse(sourceName, status.playback.duration)
 		if (!parsed.title || parsed.title === "Unknown") return emptyResult()
 
-		const key = `${parsed.title.toLowerCase().trim()}|${parsed.year ?? ""}`
+		const key = `${parsed.title.toLowerCase().trim()}|${parsed.year ?? ""}|${parsed.season ?? ""}|${parsed.subtitle ?? ""}`
+		// A fresh catalog answer (including a correction) outranks a cached poster.
+		if (catalogResult?.poster) {
+			const result: VideoCoverResult = {
+				imageUrl: catalogResult.poster,
+				sourceUrl: catalogResult.sourceUrl ?? null,
+				sourceName: catalogResult.sourceName ?? null,
+				canonicalTitle: catalogResult.title,
+			}
+			this.cacheResult(key, result)
+			return result
+		}
 		const cached = this.cache.get(key)
 		if (cached && Math.floor(Date.now() / 1000) - cached.timestamp < cached.ttl) {
 			return {
@@ -93,20 +104,9 @@ export class VideoResolver {
 		}
 		this.cache.delete(key)
 
-		if (catalogResult?.poster) {
-			const result: VideoCoverResult = {
-				imageUrl: catalogResult.poster,
-				sourceUrl: catalogResult.sourceUrl ?? null,
-				sourceName: catalogResult.sourceName ?? null,
-				canonicalTitle: catalogResult.title,
-			}
-			this.cacheResult(key, result)
-			return result
-		}
-
 		try {
 			for (const title of anilistSearchTitles(parsed)) {
-				const anilistResult = await this.anilist.searchBest(title)
+				const anilistResult = await this.anilist.searchBest(title, parsed)
 				if (anilistResult?.posterUrl) {
 					const result = this.fromCandidate(anilistResult)
 					this.cacheResult(key, result)

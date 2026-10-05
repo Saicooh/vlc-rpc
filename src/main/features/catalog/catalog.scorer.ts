@@ -95,6 +95,10 @@ function identityOf(candidate: Candidate): Identity {
 	return { season, names, baseNames }
 }
 
+export function matchesSeason(parsed: ParsedVideo, candidate: Candidate): boolean {
+	return identityOf(candidate).season === (parsed.season ?? 1)
+}
+
 function bestSimilarity(target: string, names: string[]): number {
 	let best = 0
 	for (const name of names) {
@@ -105,6 +109,17 @@ function bestSimilarity(target: string, names: string[]): number {
 
 function isHardExcluded(parsed: ParsedVideo, candidate: Candidate): boolean {
 	const hasEpisodeInfo = parsed.season !== undefined || parsed.episode !== undefined
+	// Ungrouped filenames can name a western work with the same title as an
+	// anime. A first-season or film year is useful disambiguation; sequel files
+	// often retain the franchise's original year instead of the sequel's year.
+	if (
+		parsed.signal === "western" &&
+		(parsed.season ?? 1) <= 1 &&
+		parsed.year !== undefined &&
+		candidate.year !== undefined &&
+		Math.abs(parsed.year - candidate.year) > 1
+	)
+		return true
 	return candidate.mediaKind === "movie" && hasEpisodeInfo
 }
 

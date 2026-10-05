@@ -4,7 +4,7 @@ import type { CacheEntry, CachedWork, UnresolvedReason } from "./catalog.types"
 
 // Bump when the parser, the normalizers or the scorer change in a way that
 // invalidates results computed by the previous logic.
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 const MAX_RESOLVED_ENTRIES = 200
 const TRANSIENT_TTL_MS = 5_000
 const STABLE_TTL_MS = 24 * 60 * 60_000

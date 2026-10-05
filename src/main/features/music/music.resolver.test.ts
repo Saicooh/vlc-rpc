@@ -187,6 +187,24 @@ const RIPPED: AudioFileIdentity = {
 	modifiedAt: 1_726_500_000_000,
 }
 describe("Resolver.resolve", () => {
+	it("searches remastered tags by the recording title and keeps existing correction keys", async () => {
+		const itunes = fakeProvider([candidate()])
+		const overrides = fakeOverrides()
+		const resolver = new Resolver(
+			fakeCache().cache,
+			itunes.provider,
+			fakeProvider([]).provider,
+			fakeCoverSource().source,
+			overrides.overrides,
+			noLocator(),
+		)
+		const media = { title: "Probablemente (Remastered 2011)", artist: "Christian Nodal" }
+		expect((await resolver.resolve(status(media)))?.cover).toBe("https://example.com/itunes.jpg")
+		expect(itunes.queries[0]?.title).toBe("Probablemente")
+		expect(overrides.asked[0]).toBe(
+			audioOverrideKey({ title: media.title, artists: [media.artist] }),
+		)
+	})
 	it("returns null for non audio media without touching the cache or the providers", async () => {
 		const { cache, calls: cacheCalls } = fakeCache()
 		const { provider: itunes, calls: itunesCalls } = fakeProvider([])

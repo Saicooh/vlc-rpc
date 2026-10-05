@@ -176,7 +176,7 @@ describe("Resolver.resolve", () => {
 		expect(anilistCalls.search).toBe(1)
 	})
 
-	it("routes western naming to no provider at all, and caches the miss as stable", async () => {
+	it("recognizes anime without a release-group tag", async () => {
 		const { cache, unresolvedReasons } = fakeCache()
 		const { provider: anilist, calls: anilistCalls } = fakeProvider([
 			candidate({ title: "Some Show" }),
@@ -185,12 +185,53 @@ describe("Resolver.resolve", () => {
 
 		const result = await resolver.resolve(status("Some.Show.S01E07.1080p.WEB-DL.mp4"))
 
-		// AniList does not hold western film or television, so the request is
-		// never spent. "no-results" and not "provider-error": nothing was asked,
-		// so nothing failed, and a short retry TTL would re-run this on every poll.
-		expect(result).toBeNull()
-		expect(anilistCalls.search).toBe(0)
-		expect(unresolvedReasons).toEqual(["no-results"])
+		expect(result?.title).toBe("Some Show")
+		expect(anilistCalls.search).toBe(1)
+		expect(unresolvedReasons).toEqual([])
+	})
+
+	it("rejects an unrelated anime result for a western series", async () => {
+		const { cache, unresolvedReasons } = fakeCache()
+		const { provider } = fakeProvider([candidate({ title: "The Last Airbender" })])
+		const resolver = new Resolver(cache, provider, noOverrides())
+		expect(await resolver.resolve(status("The.Last.of.Us.S01E03.mkv"))).toBeNull()
+		expect(unresolvedReasons).toEqual(["no-match"])
+	})
+
+	it("finds the requested season when the base search only returned the original", async () => {
+		const search = vi.fn(async (title: string) =>
+			title === "Overlord Season 2"
+				? [candidate({ id: "second", title: "Overlord II" })]
+				: [candidate({ id: "first", title: "Overlord" })],
+		)
+		const resolver = new Resolver(fakeCache().cache, { search }, noOverrides())
+		expect((await resolver.resolve(status("Overlord.S02E04.mkv")))?.title).toBe("Overlord II")
+		expect(search.mock.calls.map(([title]) => title)).toEqual(["Overlord", "Overlord Season 2"])
+	})
+
+	it("tries a season query after an empty base search", async () => {
+		const search = vi.fn(async (title: string) =>
+			title === "Overlord Season 2" ? [candidate({ title: "Overlord II" })] : [],
+		)
+		const resolver = new Resolver(fakeCache().cache, { search }, noOverrides())
+		expect((await resolver.resolve(status("Overlord.S02E04.mkv")))?.title).toBe("Overlord II")
+	})
+
+	it("keeps each episode number when two episodes share a pending season lookup", async () => {
+		let finish: (candidates: Candidate[]) => void = () => {}
+		const search = vi.fn(
+			() =>
+				new Promise<Candidate[]>((resolve) => {
+					finish = resolve
+				}),
+		)
+		const resolver = new Resolver(fakeCache().cache, { search }, noOverrides())
+		const first = resolver.resolve(status("Overlord.S01E03.mkv"))
+		const next = resolver.resolve(status("Overlord.S01E04.mkv"))
+		finish([candidate({ title: "Overlord" })])
+		expect((await first)?.episode).toBe(3)
+		expect((await next)?.episode).toBe(4)
+		expect(search).toHaveBeenCalledOnce()
 	})
 
 	it("returns a cache hit without calling any provider, overlaying the fresh episode", async () => {
@@ -417,7 +458,7 @@ describe("Resolver.overrideTargetFor", () => {
 		const { overrides } = fakeOverrides()
 		const resolver = new Resolver(cache, anilist, overrides)
 
-		// Western naming has no provider at all, so this never resolves.
+		// A correction target is available without any network lookup.
 		const target = resolver.overrideTargetFor(status("Some.Movie.2019.1080p.BluRay.x264.mp4"))
 
 		expect(target).toEqual({ kind: "metadata", key: "movie:Some Movie|2019", active: false })

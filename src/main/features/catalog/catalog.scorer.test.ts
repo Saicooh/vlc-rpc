@@ -50,6 +50,18 @@ describe("pickBest, identity gate", () => {
 })
 
 describe("pickBest, hard exclusion", () => {
+	it("rejects a different work with the same title and a conflicting year in an ungrouped filename", () => {
+		expect(
+			pickBest(parsed({ title: "Monster", year: 2023, signal: "western" }), [
+				candidate({ title: "Monster", year: 2004 }),
+			]),
+		).toBeNull()
+		expect(
+			pickBest(parsed({ title: "Monster", year: 2004, signal: "western" }), [
+				candidate({ title: "Monster", year: 2004 }),
+			])?.id,
+		).toBe("1")
+	})
 	it("excludes a movie candidate when the parser found season or episode", () => {
 		const result = pickBest(parsed({ title: "Some Movie", season: 1, episode: 3 }), [
 			candidate({ title: "Some Movie", aliases: [], mediaKind: "movie" }),

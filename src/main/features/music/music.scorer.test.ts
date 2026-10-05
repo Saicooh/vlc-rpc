@@ -49,6 +49,13 @@ const collaboration = candidate({
 })
 
 describe("pickBest, the shape of the credit", () => {
+	it("matches a remaster label without weakening the artist check or accepting a live take", () => {
+		const tagged = query({ title: "Probablemente (Remastered 2011)" })
+		expect(pickBest(tagged, [solo])?.id).toBe("solo")
+		expect(pickBest(query(), [candidate({ title: "Probablemente - 2011 Remaster" })])?.id).toBe("1")
+		expect(pickBest(tagged, [candidate({ artists: ["Other Artist"] })])).toBeNull()
+		expect(pickBest(tagged, [candidate({ title: "Probablemente (Live)" })])).toBeNull()
+	})
 	it("picks the solo version when the tag names one artist", () => {
 		expect(pickBest(query(), [collaboration, solo])?.id).toBe("solo")
 	})

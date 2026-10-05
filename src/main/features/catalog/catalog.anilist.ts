@@ -1,6 +1,7 @@
 import { logger } from "@main/core/logger"
 import { buildAnilistSearchCandidates, findBestAnilistMatch } from "./catalog.anilist-matcher"
-import type { Candidate, CatalogProvider } from "./catalog.types"
+import { matchesSeason, pickBest } from "./catalog.scorer"
+import type { Candidate, CatalogProvider, ParsedVideo } from "./catalog.types"
 
 const ENDPOINT = "https://graphql.anilist.co"
 const MIN_INTERVAL_MS = 250
@@ -69,7 +70,25 @@ export class AniListProvider implements CatalogProvider {
 	}
 
 	/** Search the title variants used by the legacy video cover matcher. */
-	public async searchBest(title: string): Promise<Candidate | null> {
+	public async searchBest(title: string, context?: ParsedVideo): Promise<Candidate | null> {
+		if (
+			context &&
+			!context.subtitle &&
+			(context.season !== undefined || context.year !== undefined)
+		) {
+			const parsed = { ...context, title }
+			const candidates = await this.search(title)
+			let best = pickBest(parsed, candidates)
+			if (
+				context.season !== undefined &&
+				context.season > 1 &&
+				(!best || !matchesSeason(parsed, best))
+			) {
+				const sequel = await this.search(`${title} Season ${context.season}`)
+				best = pickBest(parsed, [...candidates, ...sequel])
+			}
+			return best
+		}
 		let best: ReturnType<typeof findBestAnilistMatch> = null
 
 		for (const searchCandidate of buildAnilistSearchCandidates(title)) {

@@ -7,6 +7,7 @@ vi.mock("@main/core/logger", () => ({
 }))
 
 import { AniListProvider } from "./catalog.anilist"
+import type { Candidate } from "./catalog.types"
 
 function fixture(name: string): string {
 	return readFileSync(join(__dirname, "__fixtures__", `${name}.json`), "utf-8")
@@ -25,6 +26,53 @@ afterEach(() => {
 })
 
 describe("AniListProvider", () => {
+	it("does not let the artwork fallback accept a title with a conflicting film year", async () => {
+		const provider = new AniListProvider()
+		vi.spyOn(provider, "search").mockResolvedValue([
+			{
+				provider: "anilist",
+				id: "1",
+				title: "Monster",
+				aliases: [],
+				mediaKind: "tv",
+				year: 2004,
+				posterUrl: "https://example.test/wrong.jpg",
+			},
+		])
+		expect(
+			await provider.searchBest("Monster", { title: "Monster", year: 2023, signal: "western" }),
+		).toBeNull()
+	})
+	it("uses episode context to find a sequel missing from the base search", async () => {
+		const provider = new AniListProvider()
+		const first: Candidate = {
+			provider: "anilist",
+			id: "1",
+			title: "Overlord",
+			aliases: [],
+			mediaKind: "tv",
+			posterUrl: "https://example.test/first.jpg",
+		}
+		const second: Candidate = {
+			...first,
+			id: "2",
+			title: "Overlord II",
+			posterUrl: "https://example.test/second.jpg",
+		}
+		const search = vi
+			.spyOn(provider, "search")
+			.mockResolvedValueOnce([first])
+			.mockResolvedValueOnce([second])
+		expect(
+			await provider.searchBest("Overlord", {
+				title: "Overlord",
+				season: 2,
+				episode: 4,
+				signal: "western",
+			}),
+		).toEqual(second)
+		expect(search.mock.calls.map(([title]) => title)).toEqual(["Overlord", "Overlord Season 2"])
+	})
 	it("normalizes a search result with romaji, english, native and synonyms as aliases", async () => {
 		respondWith(fixture("anilist-search-response"))
 

@@ -5,7 +5,7 @@ import type { VlcStatus } from "@shared/vlc/vlc.types"
 import type { Cache } from "./catalog.cache"
 import { catalogKey } from "./catalog.key"
 import { parse } from "./catalog.parser"
-import { pickBest } from "./catalog.scorer"
+import { matchesSeason, pickBest } from "./catalog.scorer"
 import type {
 	CachedWork,
 	Candidate,
@@ -93,7 +93,8 @@ export class Resolver {
 
 		const existing = this.inflight.get(key)
 		if (existing) {
-			return existing
+			const result = await existing
+			return result ? { ...result, season: parsed.season, episode: parsed.episode } : null
 		}
 
 		const promise = this.resolveUncached(parsed, key)
@@ -109,9 +110,8 @@ export class Resolver {
 	/**
 	 * Where a correction for this file would be filed, without resolving it. The
 	 * media that most needs a correction is the media `resolve` answers `null`
-	 * for, since western film and television have no provider, so a key that
-	 * travelled only with a result would reach the renderer for everything except
-	 * the reason it exists.
+	 * for, so a key that travelled only with a result would omit exactly the
+	 * files that need a correction.
 	 *
 	 * `null` when the store would turn the key down, so nothing offers the user a
 	 * form that cannot be saved.
@@ -161,23 +161,30 @@ export class Resolver {
 			return null
 		}
 
-		const providers = this.providersFor(parsed.signal)
-		if (providers.length === 0) {
-			// Nothing was asked, so nothing failed. This is a stable "no source for
-			// this yet", not an outage to retry on the next poll, so it takes the
-			// same long TTL as a search that ran and came back empty.
-			this.cache.setUnresolved(key, "no-results")
-			return null
-		}
-
+		// Naming style does not identify the content: ungrouped anime must be
+		// searched too. The scorer still requires a close title or alias match.
+		const providers = [this.anilist]
 		const { candidates, allFailed } = await this.searchProviders(providers, parsed)
-
+		let best = pickBest(parsed, candidates)
+		// A base-title search can fill its first page with the original season.
+		// Ask once for the named sequel before accepting that franchise fallback.
+		if (
+			!allFailed &&
+			parsed.season !== undefined &&
+			parsed.season > 1 &&
+			(!best || !matchesSeason(parsed, best))
+		) {
+			const sequel = await this.searchProviders(providers, {
+				...parsed,
+				title: `${parsed.title} Season ${parsed.season}`,
+			})
+			candidates.push(...sequel.candidates)
+			best = pickBest(parsed, candidates)
+		}
 		if (candidates.length === 0) {
 			this.cache.setUnresolved(key, allFailed ? "provider-error" : "no-results")
 			return null
 		}
-
-		const best = pickBest(parsed, candidates)
 		if (!best) {
 			this.cache.setUnresolved(key, "no-match")
 			return null
@@ -214,17 +221,5 @@ export class Resolver {
 		}
 
 		return { candidates, allFailed: failures === providers.length }
-	}
-
-	// The signal says which naming convention produced the filename, not what
-	// kind of content it holds. "ambiguous" goes to AniList along with "fansub"
-	// because anime is often named in the western style.
-	private providersFor(signal: ParsedVideo["signal"]): CatalogProvider[] {
-		// Western naming has no source today. AniList does not hold western film
-		// or television, so asking it would spend a request that cannot succeed
-		// and cache the miss. A keyless television provider is meant to fill this
-		// route, which is why it is empty rather than pointed at AniList.
-		if (signal === "western") return []
-		return [this.anilist]
 	}
 }
