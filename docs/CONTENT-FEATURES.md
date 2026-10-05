@@ -20,7 +20,18 @@ Catalogs may not identify a sequel separately; the existing franchise fallback r
 
 ## Verification
 
-Focused privacy and artwork tests cover path boundaries, saved exclusions, early local visibility, stale URI/enrichment rejection, cancellation and upload opt-out. Exact focused and intermediate checks are recorded in this commit. Native Electron scenarios and their results are recorded by the following harness unit in `docs/TESTING.md`.
+| Check | Command / scenario | Result |
+| --- | --- | --- |
+| Focused behavior | `bun run test src/main/features/catalog src/main/features/music src/main/features/privacy src/main/features/cover/cover.video.test.ts src/renderer/src/features/media` | 429 tests, 27 files passed |
+| Shared checkout | `bun run test` | 944 tests, 64 files passed after numbered-film detection |
+| Types and bundle | `bun run build` | Node, renderer and E2E types passed; Electron bundles built |
+| Style | `bun run lint:check`, `git diff --check` | Passed |
+| Native flows | `bunx playwright test` | 4 passed with isolated settings, local VLC HTTP and simulated Discord RPC |
+| Final visual adjustment | `bunx playwright test --grep 'hides a file'` | Passed after bounding the panels at 200% zoom |
+
+The privacy flow activates hiding with the keyboard, restarts the app, restores the file, excludes a folder and its child folder, allows a similarly named sibling, removes the rule in Settings, and checks Spanish text. Screenshots in `test-results/app-hides-a-file-across-re-d96df-ers-and-restores-visibility/` were visually inspected: `hidden-file.png`, `saved-exclusions.png`, `exclusions-es.png`, and the native `excluded-folder-zoom.png` capture. The zoom test asserts the visibility panel and its restore button remain inside the viewport. Renderer tests check early visibility during pending enrichment and reject stale privacy replies. Matching tests include unrelated titles, conflicting years, different artists and live recordings.
+
+Network recognition tests use catalog fixtures and controlled responses. The native harness disables external requests; it verifies the app's HTTP/RPC and persistence boundaries, rather than live provider availability.
 
 ## Antislop delivery gate — new privacy controls
 

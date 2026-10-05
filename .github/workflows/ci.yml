@@ -59,6 +59,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run build:win
 
+      - name: Test Electron flows
+        run: bun run test:e2e
+
+      - name: Upload Electron test failures
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Electron-Test-Failures
+          path: test-results/
+          if-no-files-found: ignore
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:

@@ -68,11 +68,14 @@ The app uses Electron, React, and TypeScript. Bun 1.4.2 is the package manager.
 bun install
 bun run dev
 bun run test
+bun run test:e2e
 bun run typecheck
 bun run build:win
 ```
 
 Audio fingerprinting in a local build requires an AcoustID key in `MAIN_VITE_ACOUSTID_KEY`; see [.env.example](.env.example). Without it, that lookup is skipped. See [CONTRIBUTING.md](CONTRIBUTING.md) for code conventions and [docs/CHANGESETS.md](docs/CHANGESETS.md) for changesets.
+
+The Electron flow tests run on Windows with isolated settings and simulated VLC and Discord connections. See [docs/TESTING.md](docs/TESTING.md) for their scope.
 
 ## License and support
 
