@@ -1,4 +1,16 @@
-# Automatic content detection
+# Content visibility and automatic detection
+
+Implementation evidence, 2026-10-05. These changes share the checkout with the independently implemented performance and image-upload settings work.
+
+## Content visibility
+
+Home can hide the current local file or its folder, including subfolders. Settings lists and removes saved exclusions. Both interfaces support English and Spanish. Exclusions persist in app configuration and compare full normalized paths, with case-insensitive Windows matching and directory boundaries.
+
+Visibility controls request the local URI separately from catalog enrichment, so a slow search does not delay hiding a file. A click rereads the current URI and refuses an outdated file. Unknown or invalid local URIs wait when exclusions exist. Known web streams remain allowed. Different playlist items with the same audio title discard the previous item's privacy and enrichment.
+
+Exclusions clear Discord activity, block new lookups and local image uploads, cancel uploads in progress, and prevent a late result from republishing excluded content. They do not remove images already uploaded to a host. Rules follow paths; renaming, moving or opening through a different path can put a file outside a saved rule.
+
+## Automatic detection
 
 Ungrouped filenames now use AniList too: a release-group tag is not needed to recognize anime. The strict title/alias gate remains. A conflicting year rejects a same-title result for a plain first-season or film filename. If a base search misses the requested sequel, one additional season query is scored against the original title and episode context.
 
@@ -8,8 +20,21 @@ Catalogs may not identify a sequel separately; the existing franchise fallback r
 
 ## Verification
 
-Catalog, music and video-artwork fixtures cover sequel queries, conflicting years, unrelated titles, remaster editions and live/remix identities. Focused tests and intermediate typechecks are recorded in this commit. Native UI harness: N/A for matching changes with no new interface or IPC.
+Focused privacy and artwork tests cover path boundaries, saved exclusions, early local visibility, stale URI/enrichment rejection, cancellation and upload opt-out. Exact focused and intermediate checks are recorded in this commit. Native Electron scenarios and their results are recorded by the following harness unit in `docs/TESTING.md`.
 
-## Rollback boundary
+## Antislop delivery gate — new privacy controls
 
-Revert this commit to restore the previous catalog routing, season/year matching, cover cache identities and music edition matching, including their regression tests and cache versions. Saved corrections are separate from these caches.
+Design read: utility controls for VLC/Discord users, following the existing dark panels, typography and buttons. ENERGY 1 / RHYTHM 1 / MOTION 1. Visibility sits between the Discord preview and source information because the action concerns the file shown there; Settings holds persistent rules. Paths wrap to expose the scope. Button borders use an existing text token to identify actionable controls. No new animation was introduced.
+
+- Hard gates PASS: controls invoke typed handlers; pending, empty, unavailable-file and error states are explicit. Native screenshots show real app content. No decorative illustrations or invented claims were added.
+- Purpose gates PASS: each panel contains current visibility or saved rules. Existing surfaces and restrained button motion serve grouping and feedback. The only new outline serves button recognition.
+- Liveliness PASS: the existing Discord preview remains the Home focal point; current-file actions follow it, and saved paths use the existing Settings hierarchy. Palette, font, spacing and motion remain consistent with the app.
+- Craftsmanship PASS: hide/restore/remove and persistence pass native flows; keyboard activation and focus are visible. New panels fit at 200% zoom. English and Spanish states were inspected. WCAG contrast calculation from existing HSL tokens gives body/card 11.09:1, caption/card 5.59:1, button label/fill 8.30:1, button outline/fill 4.19:1, focus/fill 8.79:1, and error/card 6.40:1.
+
+## Rollback boundaries
+
+The behavior units are grouped with their tests, README explanations and changesets.
+
+**Visibility:** remove `src/main/features/privacy/`, `src/shared/privacy/`, `content-visibility.tsx`, `exclusions-panel.tsx`, `media.privacy.test.ts` and `.changeset/content-exclusions.md`. Remove only privacy-specific constructor callbacks/checks and wiring in `main.ts`, Discord, media, cover and presence; privacy fields/channels in shared/config/preload; renderer privacy refresh/mapping/hooks/mounts and translations; and the privacy native-flow scenario. Keep the independent performance and upload-opt-out changes in these shared files. The playlist identity/URI preservation fix can remain as a separate correctness improvement.
+
+**Detection:** revert the authored changes in `catalog.anilist.ts`, `catalog.resolver.ts`, `catalog.scorer.ts`, `catalog.cache.ts`, `cover.video.ts`, `music.resolver.ts`, `music.scorer.ts` and `music.cache.ts`, with their matching tests. Remove `music.title.ts`, `music.title.test.ts` and `.changeset/automatic-season-detection.md`, and the detection-specific README text. This unit does not require reverting exclusions or the independent performance work. Removing the cache-version bump may force another lookup; it does not alter saved corrections.

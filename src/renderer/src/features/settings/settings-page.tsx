@@ -4,6 +4,7 @@ import { configStore } from "@renderer/stores/config.store"
 import { useEffect, useState } from "react"
 import { AboutPanel } from "./components/about-panel"
 import { AppSettingsPanel } from "./components/app-settings-panel"
+import { ExclusionsPanel } from "./components/exclusions-panel"
 import { ExperimentalSettingsPanel } from "./components/experimental-settings-panel"
 import { OverridesPanel } from "./components/overrides-panel"
 import { VlcConfigForm } from "./components/vlc-config-form"
@@ -42,6 +43,7 @@ export function SettingsPage(): JSX.Element {
 			<ExperimentalSettingsPanel config={config} />
 			<VlcConfigForm initialConfig={config.vlc} />
 			<OverridesPanel />
+			<ExclusionsPanel />
 			<AboutPanel info={system} />
 		</div>
 	)

@@ -26,6 +26,7 @@ export interface DiscordPresenceData {
  * user hid it, VLC went away, or playback stopped.
  */
 export type PresenceClearReason =
+	| "content-excluded"
 	| "rpc-disabled"
 	| "vlc-unavailable"
 	| "playback-stopped"

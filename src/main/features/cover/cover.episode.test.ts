@@ -35,6 +35,84 @@ function reply(value: unknown, ok = true): { ok: boolean; json: () => Promise<un
 afterEach(() => vi.unstubAllGlobals())
 
 describe("EpisodeThumbnailResolver", () => {
+	it("does not upload a frame captured before the file was excluded", async () => {
+		let allowed = true
+		const uploadImage = vi.fn()
+		const capture = vi.fn(async () => {
+			allowed = false
+			return Buffer.from("frame")
+		})
+		const resolver = new EpisodeThumbnailResolver(
+			{ uploadImage },
+			capture,
+			() => 0.4,
+			() => true,
+			async () => allowed,
+		)
+		expect(await resolver.resolve(status(), catalog)).toBeNull()
+		expect(uploadImage).not.toHaveBeenCalled()
+	})
+	it("does not upload a frame whose capture finishes after the user opts out", async () => {
+		let enabled = true
+		const uploadImage = vi.fn()
+		const capture = vi.fn(async () => {
+			enabled = false
+			return Buffer.from("frame")
+		})
+		const resolver = new EpisodeThumbnailResolver(
+			{ uploadImage },
+			capture,
+			() => 0.4,
+			() => enabled,
+		)
+		expect(await resolver.resolve(status(), catalog)).toBeNull()
+		expect(capture).toHaveBeenCalledOnce()
+		expect(uploadImage).not.toHaveBeenCalled()
+	})
+
+	it("keeps catalog images available without capturing or uploading when disabled", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) =>
+				url.includes("singlesearch")
+					? reply({ id: 35288, name: "Uma Musume: Pretty Derby" })
+					: reply({ image: { original: "https://static.tvmaze.com/episode.jpg" } }),
+			),
+		)
+		const capture = vi.fn()
+		const uploadImage = vi.fn()
+		const resolver = new EpisodeThumbnailResolver(
+			{ uploadImage },
+			capture,
+			() => 0.4,
+			() => false,
+		)
+		expect(await resolver.resolve(status(), catalog)).toBe("https://static.tvmaze.com/episode.jpg")
+		expect(capture).not.toHaveBeenCalled()
+		expect(uploadImage).not.toHaveBeenCalled()
+	})
+
+	it("does not reuse an uploaded frame or capture another after uploads are disabled", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => reply({}, false)),
+		)
+		let enabled = true
+		const capture = vi.fn(async () => Buffer.from("frame"))
+		const uploadImage = vi.fn(async () => "https://example.test/frame.jpg")
+		const resolver = new EpisodeThumbnailResolver(
+			{ uploadImage },
+			capture,
+			() => 0.4,
+			() => enabled,
+		)
+		expect(await resolver.resolve(status(), catalog)).toBe("https://example.test/frame.jpg")
+		enabled = false
+		expect(await resolver.resolve(status(), catalog)).toBeNull()
+		expect(capture).toHaveBeenCalledTimes(1)
+		expect(uploadImage).toHaveBeenCalledTimes(1)
+	})
+
 	it("uses the chosen frame even when a catalog still exists, and can return to automatic art", async () => {
 		const fetchMock = vi.fn(async (url: string) =>
 			url.includes("singlesearch")

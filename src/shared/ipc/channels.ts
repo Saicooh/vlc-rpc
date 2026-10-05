@@ -1,6 +1,7 @@
 import type { AppConfig, VlcConfig } from "@shared/config/app-config"
 import type { DetectedMediaInfo } from "@shared/media/media.types"
 import type { LastSentPresence } from "@shared/presence/presence.types"
+import type { ContentExclusion, ContentPrivacy } from "@shared/privacy/privacy.types"
 import type {
 	UpdateAvailability,
 	UpdateCheckResult,
@@ -76,6 +77,12 @@ export type VlcConfigSaveResult = "saved" | "vlc-running" | "process-unknown" | 
  * the handler in main and the bridge in preload both exist.
  */
 export interface IpcInvokeChannelMap {
+	"privacy:describe": { request: [status?: VlcStatus]; response: ContentPrivacy | null }
+	"privacy:exclude-current": {
+		request: [uri: string, kind: ContentExclusion["kind"]]
+		response: boolean
+	}
+	"privacy:remove": { request: [rule: ContentExclusion]; response: boolean }
 	// ── Config ──────────────────────────────────────────────────────────────
 	"config:get": { request: [key?: string]; response: AppConfig | unknown }
 	"config:set": { request: [key: string, value: unknown]; response: boolean }

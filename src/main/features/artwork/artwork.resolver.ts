@@ -53,6 +53,7 @@ export class Resolver {
 				// resolver already arranges by not caching this outcome.
 				return null
 
+			case "uploads-disabled":
 			case "no-artwork": {
 				const result = await this.music.resolve(status)
 				return result?.cover ?? null

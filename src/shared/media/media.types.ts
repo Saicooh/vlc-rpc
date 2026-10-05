@@ -1,3 +1,5 @@
+import type { ContentPrivacy } from "@shared/privacy/privacy.types"
+
 export type ContentType =
 	| "tv_show"
 	| "movie"
@@ -23,6 +25,7 @@ export interface ContentMetadata {
 }
 
 export interface DetectedMediaInfo {
+	content_privacy?: ContentPrivacy
 	/** Sources and outcome of the current video's metadata lookup. */
 	metadata_diagnostic?: {
 		titleSource: string

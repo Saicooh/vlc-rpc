@@ -8,6 +8,7 @@ import type {
 } from "@shared/ipc/channels"
 import type { DetectedMediaInfo } from "@shared/media/media.types"
 import type { LastSentPresence } from "@shared/presence/presence.types"
+import type { ContentExclusion, ContentPrivacy } from "@shared/privacy/privacy.types"
 import type {
 	UpdateAvailability,
 	UpdateCheckResult,
@@ -19,6 +20,11 @@ declare global {
 	interface Window {
 		electron: ElectronAPI
 		api: {
+			privacy: {
+				describe: (status?: VlcStatus) => Promise<ContentPrivacy | null>
+				excludeCurrent: (uri: string, kind: ContentExclusion["kind"]) => Promise<boolean>
+				remove: (rule: ContentExclusion) => Promise<boolean>
+			}
 			config: {
 				get: <T = AppConfig>(key?: string) => Promise<T>
 				set: (key: string, value: unknown) => Promise<boolean>

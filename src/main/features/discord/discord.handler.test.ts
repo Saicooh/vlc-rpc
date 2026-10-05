@@ -6,13 +6,19 @@ import type { VlcStatus } from "@shared/vlc/vlc.types"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Client as DiscordClient } from "./discord.client"
 
-const { mockPresenceUpdateInterval, mockHideWhenPaused, mockSpanishTitles, mockThumbnails } =
-	vi.hoisted(() => ({
-		mockPresenceUpdateInterval: { value: 1500 },
-		mockHideWhenPaused: { value: false },
-		mockSpanishTitles: { value: false },
-		mockThumbnails: { value: false },
-	}))
+const {
+	mockPresenceUpdateInterval,
+	mockHideWhenPaused,
+	mockSpanishTitles,
+	mockThumbnails,
+	mockUploads,
+} = vi.hoisted(() => ({
+	mockPresenceUpdateInterval: { value: 1500 },
+	mockHideWhenPaused: { value: false },
+	mockSpanishTitles: { value: false },
+	mockThumbnails: { value: false },
+	mockUploads: { value: true },
+}))
 
 vi.mock("@main/core/logger", () => ({
 	logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
@@ -23,17 +29,19 @@ vi.mock("@main/core/ipc", () => ({ registerHandler: () => {} }))
 vi.mock("@main/core/config", () => ({
 	configService: {
 		get: (key?: string) =>
-			key === "presenceUpdateInterval"
-				? mockPresenceUpdateInterval.value
-				: key === "hideActivityWhenPaused"
-					? mockHideWhenPaused.value
-					: key === "preferSpanishEpisodeTitles"
-						? mockSpanishTitles.value
-						: key === "showEpisodeThumbnails"
-							? mockThumbnails.value
-							: key === "largeImage"
-								? "vlc_logo"
-								: {},
+			key === "allowLocalArtworkUploads"
+				? mockUploads.value
+				: key === "presenceUpdateInterval"
+					? mockPresenceUpdateInterval.value
+					: key === "hideActivityWhenPaused"
+						? mockHideWhenPaused.value
+						: key === "preferSpanishEpisodeTitles"
+							? mockSpanishTitles.value
+							: key === "showEpisodeThumbnails"
+								? mockThumbnails.value
+								: key === "largeImage"
+									? "vlc_logo"
+									: {},
 		set: () => {},
 		delete: () => {},
 	},
@@ -55,6 +63,7 @@ afterEach(() => {
 	mockHideWhenPaused.value = false
 	mockSpanishTitles.value = false
 	mockThumbnails.value = false
+	mockUploads.value = true
 })
 
 import { DiscordRpcHandler } from "./discord.handler"
@@ -292,6 +301,80 @@ describe("DiscordRpcHandler update loop", () => {
 		expect(discord.calls.update).toBe(0)
 		expect(handler.getLastPresence()).toEqual({ kind: "cleared", reason: "loop-stopped" })
 	})
+	it("clears excluded content before any lookup and restores it when the exclusion is removed", async () => {
+		vi.useFakeTimers()
+		let hidden = true
+		const discord = fakeDiscord()
+		const getDiscordPresence = vi.fn(async () => PRESENCE)
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => status()),
+			{ getDiscordPresence } as unknown as PresenceService,
+			new FakeClock(),
+			{ isExcluded: async () => hidden },
+		)
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.clear).toBe(1)
+		expect(getDiscordPresence).not.toHaveBeenCalled()
+		expect(handler.getLastPresence()).toEqual({ kind: "cleared", reason: "content-excluded" })
+		hidden = false
+		await handler.refreshPrivacy()
+		expect(discord.calls.update).toBe(1)
+		handler.stopUpdateLoop()
+	})
+	it("clears immediately while a lookup is pending and never publishes its late answer", async () => {
+		vi.useFakeTimers()
+		let hidden = false
+		let finish!: (value: DiscordPresenceData) => void
+		const getDiscordPresence = vi.fn(
+			() =>
+				new Promise<DiscordPresenceData>((resolve) => {
+					finish = resolve
+				}),
+		)
+		const discord = fakeDiscord()
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => status()),
+			{ getDiscordPresence } as unknown as PresenceService,
+			new FakeClock(),
+			{ isExcluded: async () => hidden },
+		)
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(getDiscordPresence).toHaveBeenCalledOnce()
+		hidden = true
+		await handler.refreshPrivacy()
+		expect(discord.calls.clear).toBe(1)
+		finish(PRESENCE)
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(0)
+		handler.stopUpdateLoop()
+	})
+	it("discards an activity resolved before uploads were disabled and retries on the next tick", async () => {
+		vi.useFakeTimers()
+		const discord = fakeDiscord()
+		const presence = {
+			getDiscordPresence: async () => {
+				mockUploads.value = false
+				return PRESENCE
+			},
+		} as unknown as PresenceService
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => status()),
+			presence,
+			new FakeClock(),
+		)
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(0)
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(discord.calls.update).toBe(1)
+		handler.stopUpdateLoop()
+	})
+
 	it("rechecks a missing episode title during playback and sends it when found", async () => {
 		vi.useFakeTimers()
 		const clock = new FakeClock()

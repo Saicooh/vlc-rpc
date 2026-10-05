@@ -37,6 +37,10 @@ Use **Layout** to arrange the fields on your Discord card. Music and video have 
 
 The app checks for new releases. Installed copies can download an update; portable copies open the release page.
 
+On Home, use **Hide this file** to keep a local file off Discord, or **Exclude this folder** to hide everything in its folder and subfolders. Exclusions use the full file path and survive app restarts. Remove an exclusion on Home or under **Hidden content** in Settings. Moving or renaming a file can put it outside the saved exclusion.
+
+Excluded content is cleared from Discord and skips new catalog lookups and image uploads. Uploads in progress are cancelled; this does not remove images already held by a host. A lookup already in progress can finish, but its result cannot republish excluded content. While exclusions exist, the app waits for VLC's file URI before publishing unidentified content. Known radio and web streams remain available.
+
 ## Artwork and privacy
 
 The app first checks local artwork and media tags, then searches public catalogs. Audio without useful tags can be identified by an acoustic fingerprint through AcoustID. Uncertain matches may keep the filename or show no cover rather than display the wrong title or image.
@@ -44,6 +48,8 @@ The app first checks local artwork and media tags, then searches public catalogs
 Music searches ignore explicit edition labels such as `(Remastered 2011)` while preserving live and remix titles and checking the artist. Video matching still requires a close title or alias match; a season search cannot turn an unrelated result into a match. If no catalog entry identifies a sequel separately, the existing franchise fallback remains available.
 
 **Local artwork and selected video frames are uploaded to a public image host so Discord can display them.** Anyone with the resulting link can view the image while the host keeps it. The app uploads the image under a generated name, without your media filename or path. Uploaded images may expire, so a cover can disappear until you play the file again. You can use a correction with an existing web image instead of uploading local artwork.
+
+Turn off **Allow local image uploads** during first run or in Settings to prevent these uploads. The app uses catalog images or its default icon instead, and episode thumbnails can still come from TVMaze. Turning this off cancels uploads in progress but does not delete images already held by an image host. Catalog lookups and acoustic identification remain separate network requests.
 
 Corrections have different scopes: a video correction follows the title parsed from its filename, tagged audio corrections apply to the album, and corrections for untagged audio follow the file. Moving or renaming an untagged file can therefore make its correction stop applying.
 

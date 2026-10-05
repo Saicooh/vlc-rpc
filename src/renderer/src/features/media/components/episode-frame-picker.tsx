@@ -19,6 +19,7 @@ export function EpisodeFramePicker({ media }: { media: MediaState }): JSX.Elemen
 
 	if (
 		config?.showEpisodeThumbnails !== true ||
+		config.allowLocalArtworkUploads === false ||
 		media.mediaType !== "video" ||
 		media.episode === null ||
 		!media.sourceUri?.startsWith("file://")

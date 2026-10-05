@@ -1,6 +1,7 @@
 import { configService } from "@main/core/config"
 import { registerHandler } from "@main/core/ipc"
 import type { Client as VlcClient } from "@main/features/vlc"
+import type { VlcStatus } from "@shared/vlc/vlc.types"
 import {
 	type EpisodeThumbnailResolver,
 	FRAME_POSITIONS,
@@ -14,11 +15,14 @@ export class EpisodeFrameHandler {
 		private readonly vlc: VlcClient,
 		private readonly thumbnails: EpisodeThumbnailResolver,
 		private readonly forceNextUpdate: () => void,
+		private readonly contentAllowed: (status: VlcStatus) => Promise<boolean> = async () => true,
 	) {
 		registerHandler("media:preview-frames", async () => {
+			if (configService.get("allowLocalArtworkUploads") === false) return null
 			if (configService.get("showEpisodeThumbnails") !== true) return null
 			const status = await this.vlc.readStatus(true)
 			if (!status?.active || status.playback.duration <= 0) return null
+			if (!(await this.contentAllowed(status))) return null
 			const key = episodeFrameKey(status)
 			if (!key) return null
 			const captures = await Promise.all(
@@ -34,10 +38,12 @@ export class EpisodeFrameHandler {
 		})
 
 		registerHandler("media:select-frame", async (key, position) => {
+			if (configService.get("allowLocalArtworkUploads") === false) return false
 			if (configService.get("showEpisodeThumbnails") !== true) return false
 			if (!FRAME_POSITIONS.includes(position as (typeof FRAME_POSITIONS)[number])) return false
 			const status = await this.vlc.readStatus(true)
 			if (!status?.active || episodeFrameKey(status) !== key) return false
+			if (!(await this.contentAllowed(status))) return false
 			const existing = configService.get("episodeFrameChoices") ?? {}
 			// Keep the most recent 100 choices; config is written as one JSON file.
 			const choices = Object.fromEntries(

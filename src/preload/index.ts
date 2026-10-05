@@ -9,6 +9,11 @@ import { onEvent, typedInvoke } from "./typed-bridge"
 exposeLogger()
 
 const api = {
+	privacy: {
+		describe: typedInvoke("privacy:describe"),
+		excludeCurrent: typedInvoke("privacy:exclude-current"),
+		remove: typedInvoke("privacy:remove"),
+	},
 	config: {
 		get: typedInvoke("config:get"),
 		set: typedInvoke("config:set"),

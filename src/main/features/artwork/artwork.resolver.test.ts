@@ -45,6 +45,13 @@ function fakeMusic(result: MusicResult | null, override: string | null = null) {
 const catalogHit: MusicResult = { cover: CATALOG_COVER, provider: "itunes", id: "42" }
 
 describe("Artwork resolver", () => {
+	it("uses catalog artwork when local uploads are disabled", async () => {
+		const cover = fakeCover({ kind: "uploads-disabled" })
+		const music = fakeMusic(catalogHit)
+		expect(await new Resolver(cover.cover, music.music).resolve(status())).toBe(CATALOG_COVER)
+		expect(music.calls.resolve).toBe(1)
+	})
+
 	it("uses the published artwork and consults no catalog", async () => {
 		const cover = fakeCover({ kind: "published", url: "https://uploads.example/local.jpg" })
 		const music = fakeMusic(catalogHit)

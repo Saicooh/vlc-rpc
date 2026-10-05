@@ -6,6 +6,7 @@ import { logger } from "@main/core/logger"
 import { parse as parseVideo } from "@main/features/catalog/catalog.parser"
 import { Timeline, presenceKey } from "@main/features/presence"
 import type { Service as PresenceService } from "@main/features/presence"
+import type { Service as PrivacyService } from "@main/features/privacy/privacy.service"
 import type { Client as VlcClient } from "@main/features/vlc"
 import type { LastSentPresence, PresenceClearReason } from "@shared/presence/presence.types"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
@@ -43,6 +44,7 @@ export class DiscordRpcHandler {
 		private readonly vlc: VlcClient,
 		private readonly presence: PresenceService,
 		private readonly clock: Clock,
+		private readonly privacy?: Pick<PrivacyService, "isExcluded">,
 	) {
 		this.timeline = new Timeline(clock)
 		this.registerHandlers()
@@ -58,6 +60,15 @@ export class DiscordRpcHandler {
 		this.lastSentKey = null
 		this.desiredKey = null
 		this.revision++
+	}
+
+	public async refreshPrivacy(): Promise<boolean> {
+		this.forceNextUpdate()
+		const status = await this.readCurrentStatus(false)
+		if (status && (await this.privacy?.isExcluded(status))) {
+			return this.pushClear("content-excluded")
+		}
+		return this.updatePresence(true)
 	}
 
 	private registerHandlers(): void {
@@ -199,6 +210,7 @@ export class DiscordRpcHandler {
 
 	private async performUpdatePresence(force: boolean): Promise<boolean> {
 		try {
+			const uploadsEnabled = configService.get("allowLocalArtworkUploads") !== false
 			if (!this.discord.isRpcEnabled()) {
 				// Skipping the update is not enough: the last activity would stay
 				// pinned on Discord while the user believes they are hidden.
@@ -216,6 +228,9 @@ export class DiscordRpcHandler {
 			if (!vlcStatus) {
 				return this.pushClear("vlc-unavailable")
 			}
+			const excluded = await this.privacy?.isExcluded(vlcStatus)
+			if (readRevision !== this.revision) return false
+			if (excluded) return this.pushClear("content-excluded")
 			if (
 				vlcStatus.active &&
 				vlcStatus.status === "paused" &&
@@ -226,10 +241,11 @@ export class DiscordRpcHandler {
 
 			const window = this.timeline.update(vlcStatus)
 			const mediaKey = presenceKey(vlcStatus, this.timeline.currentEpoch)
-			const key =
+			const mediaLayoutKey =
 				vlcStatus.mediaType === "video"
 					? `${mediaKey}|es:${configService.get("preferSpanishEpisodeTitles") === true}|thumb:${configService.get("showEpisodeThumbnails") === true}`
 					: mediaKey
+			const key = `${mediaLayoutKey}|uploads:${uploadsEnabled}`
 			this.setDesiredKey(key)
 			const sameKey = key === this.lastSentKey
 			const retryArtwork =
@@ -251,6 +267,12 @@ export class DiscordRpcHandler {
 			const update = (async () => {
 				const presenceData = await this.presence.getDiscordPresence(vlcStatus, window)
 				if (revision !== this.revision) return false
+				if (await this.privacy?.isExcluded(vlcStatus)) return this.pushClear("content-excluded")
+				// A lookup started under the old choice must not put local artwork back after an opt-out.
+				if (uploadsEnabled !== (configService.get("allowLocalArtworkUploads") !== false)) {
+					this.forceNextUpdate()
+					return false
+				}
 				if (!presenceData) {
 					return this.pushClear("playback-stopped")
 				}
@@ -268,9 +290,16 @@ export class DiscordRpcHandler {
 
 				return this.publish(async () => {
 					if (revision !== this.revision || !this.discord.isRpcEnabled()) return false
+					if (await this.privacy?.isExcluded(vlcStatus))
+						return this.clearPresence("content-excluded")
 					if (revision !== this.revision) return false
 					const sent = await this.discord.update(presenceData)
 					if (sent) this.presenceCleared = false
+					// An exclusion can be saved while Discord is still acknowledging an earlier send.
+					if (await this.privacy?.isExcluded(vlcStatus)) {
+						this.presenceCleared = false
+						return this.clearPresence("content-excluded")
+					}
 					if (revision !== this.revision) return false
 					if (sent) {
 						this.lastSentKey = key

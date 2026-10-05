@@ -284,6 +284,7 @@ class PlayingState extends MediaState {
 		private readonly localVideoArtwork: LocalVideoArtwork,
 		private readonly episodeTitles: EpisodeTitleLookup,
 		private readonly episodeThumbnails: EpisodeThumbnailLookup,
+		private readonly contentAllowed: (status: VlcStatus) => Promise<boolean>,
 	) {
 		super()
 	}
@@ -309,6 +310,7 @@ class PlayingState extends MediaState {
 		)
 
 		const catalogResult = mediaType === "video" ? await this.catalog.resolve(mediaInfo) : null
+		if (!(await this.contentAllowed(mediaInfo))) return null
 		// Parsed even on a catalog hit: the providers never report the year of the
 		// concrete file being played, and parsing is pure and local.
 		const videoName = media.filename || media.title || ""
@@ -325,6 +327,7 @@ class PlayingState extends MediaState {
 						this.episodeTitles.resolve(mediaInfo, catalogResult),
 					])
 				: [null, null, null]
+		if (!(await this.contentAllowed(mediaInfo))) return null
 		const episodeThumbnail =
 			config.showEpisodeThumbnails === true &&
 			mediaType === "video" &&
@@ -338,6 +341,7 @@ class PlayingState extends MediaState {
 		// asked in the other order the text would answer from the poll before,
 		// leaving the right cover beside the file name for one turn of the loop.
 		const cover = mediaType === "audio" ? await this.artwork.resolve(mediaInfo) : null
+		if (!(await this.contentAllowed(mediaInfo))) return null
 		const corrected =
 			mediaType === "audio" ? await this.corrections.correctedTagsFor(mediaInfo) : null
 
@@ -424,6 +428,7 @@ class PausedState extends MediaState {
 		private readonly localVideoArtwork: LocalVideoArtwork,
 		private readonly episodeTitles: EpisodeTitleLookup,
 		private readonly episodeThumbnails: EpisodeThumbnailLookup,
+		private readonly contentAllowed: (status: VlcStatus) => Promise<boolean>,
 	) {
 		super()
 	}
@@ -449,6 +454,7 @@ class PausedState extends MediaState {
 		)
 
 		const catalogResult = mediaType === "video" ? await this.catalog.resolve(mediaInfo) : null
+		if (!(await this.contentAllowed(mediaInfo))) return null
 		// Parsed even on a catalog hit: the providers never report the year of the
 		// concrete file being played, and parsing is pure and local.
 		const videoName = media.filename || media.title || ""
@@ -465,6 +471,7 @@ class PausedState extends MediaState {
 						this.episodeTitles.resolve(mediaInfo, catalogResult),
 					])
 				: [null, null, null]
+		if (!(await this.contentAllowed(mediaInfo))) return null
 		const episodeThumbnail =
 			config.showEpisodeThumbnails === true &&
 			mediaType === "video" &&
@@ -478,6 +485,7 @@ class PausedState extends MediaState {
 		// asked in the other order the text would answer from the poll before,
 		// leaving the right cover beside the file name for one turn of the loop.
 		const cover = mediaType === "audio" ? await this.artwork.resolve(mediaInfo) : null
+		if (!(await this.contentAllowed(mediaInfo))) return null
 		const corrected =
 			mediaType === "audio" ? await this.corrections.correctedTagsFor(mediaInfo) : null
 
@@ -567,6 +575,7 @@ export class Service {
 		localVideoArtwork: LocalVideoArtwork = NO_LOCAL_VIDEO_ARTWORK,
 		episodeTitles: EpisodeTitleLookup = { resolve: async () => null },
 		episodeThumbnails: EpisodeThumbnailLookup = { resolve: async () => null },
+		contentAllowed: (status: VlcStatus) => Promise<boolean> = async () => true,
 	) {
 		this.states = {
 			stopped: new StoppedState(),
@@ -580,6 +589,7 @@ export class Service {
 				localVideoArtwork,
 				episodeTitles,
 				episodeThumbnails,
+				contentAllowed,
 			),
 			paused: new PausedState(
 				artwork,
@@ -590,6 +600,7 @@ export class Service {
 				localVideoArtwork,
 				episodeTitles,
 				episodeThumbnails,
+				contentAllowed,
 			),
 		}
 

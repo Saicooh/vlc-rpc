@@ -22,6 +22,11 @@ function stampNow(): InfoStamp {
 	}
 }
 
+export async function refreshAfterPrivacyChange(): Promise<void> {
+	corrections += 1
+	await Promise.all([refreshMediaInfo(), refreshLastPresence()])
+}
+
 export function updateFromVlcStatus(status: VlcStatus | null): void {
 	const previous = mediaStore.get()
 	const current = mergeVlcStatus(previous, status)
@@ -57,6 +62,9 @@ async function readMediaInfo(
 		if (vlcStatusStore.get() !== "connected") {
 			return
 		}
+		// Visibility controls only need a local URI, so a catalog request must
+		// not hold up the user's ability to hide the currently playing file.
+		void refreshContentPrivacy(asked, revision, status)
 
 		const mediaInfo = await window.api.media.getMediaInfo(status)
 
@@ -79,6 +87,7 @@ async function readMediaInfo(
 				overrideActive: false,
 				overrideBinding: null,
 				nameSource: null,
+				privacy: null,
 			})
 			return
 		}
@@ -91,6 +100,7 @@ async function readMediaInfo(
 
 		mediaStore.set({
 			...mediaStore.get(),
+			privacy: mediaInfo.content_privacy ?? null,
 			sourceUri: mediaInfo.media.sourceUri ?? null,
 			contentType: mediaInfo.content_type || null,
 			contentImageUrl: mediaInfo.content_image_url || null,
@@ -123,6 +133,21 @@ async function readMediaInfo(
 		logger.info("Media information updated")
 	} catch (error) {
 		logger.error(`Error fetching media info: ${error}`)
+	}
+}
+
+async function refreshContentPrivacy(
+	asked: InfoStamp,
+	revision: number,
+	status?: VlcStatus,
+): Promise<void> {
+	try {
+		const privacy = await window.api.privacy.describe(status)
+		if (revision === playbackRevision && stampsAgree(asked, stampNow())) {
+			mediaStore.set({ ...mediaStore.get(), privacy })
+		}
+	} catch (error) {
+		logger.error(`Error checking content visibility: ${error}`)
 	}
 }
 

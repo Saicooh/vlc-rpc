@@ -17,6 +17,8 @@ export class Resolver {
 		private readonly vlc: VlcClient,
 		private readonly store: CoverStore,
 		private readonly uploader: CoverUploader,
+		private readonly uploadsEnabled: () => boolean = () => true,
+		private readonly contentAllowed: (status: VlcStatus) => Promise<boolean> = async () => true,
 	) {
 		logger.info("Cover art service initialized")
 	}
@@ -27,6 +29,9 @@ export class Resolver {
 	 * cached outcome instead of repeating the network round trip.
 	 */
 	public async fetch(mediaInfo: VlcStatus | null): Promise<CoverOutcome> {
+		if (mediaInfo && !(await this.contentAllowed(mediaInfo))) return { kind: "uploads-disabled" }
+		// Check before cached links too: opting out also stops using previously uploaded local artwork.
+		if (!this.uploadsEnabled()) return { kind: "uploads-disabled" }
 		const media = this.extractMediaData(mediaInfo)
 		if (!media || !mediaInfo) {
 			return { kind: "no-artwork" }
@@ -39,7 +44,7 @@ export class Resolver {
 
 		const pending = this.inflight.get(key)
 		if (pending) return pending
-		const lookup = this.resolveAndCache(key, media)
+		const lookup = this.resolveAndCache(key, media, mediaInfo)
 		this.inflight.set(key, lookup)
 		try {
 			return await lookup
@@ -48,12 +53,19 @@ export class Resolver {
 		}
 	}
 
-	private async resolveAndCache(key: string, media: VlcStatus["media"]): Promise<CoverOutcome> {
-		const outcome = await this.resolve(media)
+	private async resolveAndCache(
+		key: string,
+		media: VlcStatus["media"],
+		status: VlcStatus,
+	): Promise<CoverOutcome> {
+		const outcome = await this.resolve(media, status)
+		if (!this.uploadsEnabled() || !(await this.contentAllowed(status))) {
+			return { kind: "uploads-disabled" }
+		}
 		// A failed publish says nothing about the album, only about this attempt,
 		// so it is not remembered: the next poll retries instead of reporting a
 		// cached failure until the track changes.
-		if (outcome.kind === "publish-failed") {
+		if (outcome.kind === "publish-failed" || outcome.kind === "uploads-disabled") {
 			return outcome
 		}
 
@@ -62,7 +74,7 @@ export class Resolver {
 		return outcome
 	}
 
-	private async resolve(media: VlcStatus["media"]): Promise<CoverOutcome> {
+	private async resolve(media: VlcStatus["media"], status: VlcStatus): Promise<CoverOutcome> {
 		// Step 1: Check if media already has an uploaded image URL in its metadata
 		const fileUri = await this.vlc.getCurrentFileUri()
 		if (fileUri && media.artworkUrl) {
@@ -85,7 +97,7 @@ export class Resolver {
 
 		// Step 2: Prioritize local artwork from the file
 		if (media.artworkUrl?.startsWith("file://")) {
-			return await this.publishLocalArtwork(media.artworkUrl, fileUri)
+			return await this.publishLocalArtwork(media.artworkUrl, fileUri, status)
 		}
 
 		// Not the end of the search: the artwork coordinator takes a no-artwork
@@ -98,6 +110,7 @@ export class Resolver {
 	private async publishLocalArtwork(
 		artworkUrl: string,
 		fileUri: string | null,
+		status: VlcStatus,
 	): Promise<CoverOutcome> {
 		try {
 			const localPath = artworkUrl.replace("file://", "")
@@ -110,6 +123,7 @@ export class Resolver {
 					: decodedPath
 
 			const imageBuffer = await fs.readFile(fixedPath)
+			if (!(await this.contentAllowed(status))) return { kind: "uploads-disabled" }
 			const filename = `cover_${Date.now()}.jpg`
 			const uploadedUrl = await this.uploader.uploadImage(imageBuffer, filename, 24 * 7) // 7 days
 

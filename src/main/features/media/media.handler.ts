@@ -11,6 +11,7 @@ import { parse as parseVideo } from "@main/features/catalog/catalog.parser"
 import type { CoverOutcome } from "@main/features/cover"
 import { episodeFrameKey } from "@main/features/cover/cover.episode"
 import type { CorrectedTags, OverrideTarget } from "@main/features/overrides"
+import type { Service as PrivacyService } from "@main/features/privacy/privacy.service"
 import type { Client as VlcClient } from "@main/features/vlc"
 import type { ContentMetadata, ContentType, DetectedMediaInfo } from "@shared/media/media.types"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
@@ -130,6 +131,7 @@ export class MediaInfoHandler {
 		private readonly episodeTitles?: EpisodeTitleLookup,
 		private readonly retryLookup?: (status: VlcStatus) => Promise<void> | void,
 		private readonly hasChosenFrame?: (key: string) => boolean,
+		private readonly privacy?: PrivacyService,
 	) {
 		this.registerHandlers()
 	}
@@ -156,6 +158,7 @@ export class MediaInfoHandler {
 		registerHandler("media:retry-lookup", async () => {
 			const status = await this.vlc.readStatus(true)
 			if (!status?.active || status.mediaType !== "video") return false
+			if (await this.privacy?.isExcluded(status)) return false
 			await this.retryLookup?.(status)
 			return true
 		})
@@ -169,13 +172,17 @@ export class MediaInfoHandler {
 		}
 
 		try {
+			const privacy = await this.privacy?.describe(vlcStatus)
 			const mediaInfo: VlcStatus & DetectedMediaInfo = {
 				...vlcStatus,
 				media: { ...vlcStatus.media },
+				...(privacy ? { content_privacy: privacy } : {}),
 			}
+			if (privacy?.hidden) return mediaInfo
 
 			if (vlcStatus.mediaType === "audio") {
 				const cover = await this.artwork.resolve(vlcStatus)
+				if (await this.privacy?.isExcluded(vlcStatus)) return this.hiddenInfo(vlcStatus)
 				if (cover) {
 					mediaInfo.content_image_url = cover
 				}
@@ -200,7 +207,9 @@ export class MediaInfoHandler {
 
 			if (vlcStatus.mediaType === "video") {
 				const localCover = await this.localVideoArtwork?.fetch(vlcStatus)
+				if (await this.privacy?.isExcluded(vlcStatus)) return this.hiddenInfo(vlcStatus)
 				const catalogResult = await this.catalog.resolve(vlcStatus)
+				if (await this.privacy?.isExcluded(vlcStatus)) return this.hiddenInfo(vlcStatus)
 				const videoName = vlcStatus.media.filename || vlcStatus.media.title || ""
 				const parsed = parseVideo(videoName, vlcStatus.playback.duration)
 				const diagnostic: NonNullable<DetectedMediaInfo["metadata_diagnostic"]> = {
@@ -261,10 +270,17 @@ export class MediaInfoHandler {
 			if (mediaInfo.content_image_url) {
 				mediaInfo.content_image_source_url = mediaInfo.content_image_url
 			}
+
+			if (await this.privacy?.isExcluded(vlcStatus)) return this.hiddenInfo(vlcStatus)
 			return mediaInfo
 		} catch (error) {
 			logger.error(`Error processing media info: ${error}`)
 			return vlcStatus
 		}
+	}
+
+	private async hiddenInfo(status: VlcStatus): Promise<VlcStatus & DetectedMediaInfo> {
+		const privacy = await this.privacy?.describe(status)
+		return { ...status, ...(privacy ? { content_privacy: privacy } : {}) }
 	}
 }

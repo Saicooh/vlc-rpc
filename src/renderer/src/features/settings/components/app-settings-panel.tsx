@@ -1,3 +1,4 @@
+import { LocalArtworkUploadsRow } from "@renderer/components/local-artwork-uploads-row"
 import { Button } from "@renderer/components/ui/button"
 import { Input } from "@renderer/components/ui/input"
 import { Panel, Row } from "@renderer/components/ui/panel"
@@ -73,6 +74,7 @@ export function AppSettingsPanel({
 
 	return (
 		<Panel label={t("App")}>
+			<LocalArtworkUploadsRow />
 			<Row
 				htmlFor="interfaceLanguage"
 				label={t("Interface language")}

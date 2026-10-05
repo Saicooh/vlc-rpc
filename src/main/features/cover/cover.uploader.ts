@@ -59,6 +59,7 @@ export class Uploader {
 	private readonly appName = "VLC-Discord-RPC"
 	private readonly userAgent: string
 	private readonly cooldownUntil = new Map<string, number>()
+	private readonly activeUploads = new Set<AbortController>()
 
 	private readonly services: ImageUploadService[] = [
 		{
@@ -97,7 +98,10 @@ export class Uploader {
 		},
 	]
 
-	constructor(appVersion = "5.0.1") {
+	constructor(
+		appVersion = "5.0.1",
+		private readonly uploadsEnabled: () => boolean = () => true,
+	) {
 		this.appVersion = appVersion
 		this.userAgent = `${this.appName}/${this.appVersion}`
 		logger.info("Multi-service image uploader initialized")
@@ -108,6 +112,7 @@ export class Uploader {
 		filename: string,
 		expiryHours = 24,
 	): Promise<string | null> {
+		if (!this.uploadsEnabled()) return null
 		const fileSize = imageBuffer.length
 
 		for (const service of this.services) {
@@ -129,6 +134,7 @@ export class Uploader {
 
 		const attempts = entrants.map((service) => {
 			const controller = new AbortController()
+			this.activeUploads.add(controller)
 			return {
 				controller,
 				result: this.attempt(service, controller, { image, filename, expiryHours }),
@@ -139,8 +145,10 @@ export class Uploader {
 		try {
 			winner = await Promise.any(attempts.map((attempt) => attempt.result))
 		} catch {
-			logger.error("All upload services failed")
+			if (this.uploadsEnabled()) logger.error("All upload services failed")
 			return null
+		} finally {
+			for (const attempt of attempts) this.activeUploads.delete(attempt.controller)
 		}
 
 		// Every entrant is uploading the same bytes, so the moment one of them has a
@@ -152,7 +160,12 @@ export class Uploader {
 		}
 
 		logger.info(`Upload won by ${winner.serviceName}: ${winner.url}`)
-		return winner.url
+		return this.uploadsEnabled() ? winner.url : null
+	}
+
+	public cancelUploads(): void {
+		for (const controller of this.activeUploads) controller.abort()
+		this.activeUploads.clear()
 	}
 
 	private async attempt(

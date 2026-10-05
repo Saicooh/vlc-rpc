@@ -3,6 +3,7 @@ import type { LastSentPresence } from "@shared/presence/presence.types"
 import { atom } from "nanostores"
 
 export interface MediaState {
+	privacy?: DetectedMediaInfo["content_privacy"] | null
 	playlistId?: number | null
 	mediaStatus: MediaStatus
 	// Basic info (from VLC status)
@@ -53,6 +54,7 @@ export interface MediaState {
 }
 
 const INITIAL_STATE: MediaState = {
+	privacy: null,
 	playlistId: null,
 	mediaStatus: "stopped",
 	title: null,

@@ -138,6 +138,27 @@ afterEach(() => {
 })
 
 describe("Uploader race", () => {
+	it("never contacts an image host when uploads are disabled", async () => {
+		const fetchMock = vi.fn()
+		vi.stubGlobal("fetch", fetchMock)
+		expect(await new Uploader("5.2.0", () => false).uploadImage(artwork(), "cover.jpg")).toBeNull()
+		expect(fetchMock).not.toHaveBeenCalled()
+	})
+
+	it("cancels in-flight uploads when the user disables them", async () => {
+		let enabled = true
+		const entrants = stubRace(() => ({ kind: "hang" }))
+		const uploader = new Uploader("5.2.0", () => enabled)
+		const pending = uploader.uploadImage(artwork(), "cover.jpg")
+		enabled = false
+		uploader.cancelUploads()
+		expect(await pending).toBeNull()
+		expect(entrants).toHaveLength(5)
+		expect(entrants.every((entrant) => entrant.signal.aborted)).toBe(true)
+		expect(await uploader.uploadImage(artwork(), "cover.jpg")).toBeNull()
+		expect(entrants).toHaveLength(5)
+	})
+
 	it("builds one image from the exact Buffer slice for all upload services", async () => {
 		const append = vi.spyOn(FormData.prototype, "append")
 		const uploads: Array<{ bytes: number[]; type: string }> = []

@@ -144,6 +144,8 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 			position?: number,
 		) => Promise<Buffer | null> = captureEpisodeFrame,
 		private readonly choiceFor: (key: string) => number | undefined = () => undefined,
+		private readonly uploadsEnabled: () => boolean = () => true,
+		private readonly contentAllowed: (status: VlcStatus) => Promise<boolean> = async () => true,
 	) {}
 
 	public clearCache(): void {
@@ -151,6 +153,7 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 	}
 
 	public async resolve(status: VlcStatus, catalog: CatalogResult | null): Promise<string | null> {
+		if (!(await this.contentAllowed(status))) return null
 		if (status.mediaType !== "video" || catalog?.mediaKind === "movie") return null
 		const parsed = parse(
 			status.media.filename || status.media.title || "",
@@ -160,11 +163,12 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 		const episode = status.media.episode ?? catalog?.episode ?? parsed.episode
 		if (!episode || episode < 1) return null
 		const frameKey = episodeFrameKey(status, catalog)
-		const chosen = frameKey ? this.choiceFor(frameKey) : undefined
+		const uploadsEnabled = this.uploadsEnabled()
+		const chosen = uploadsEnabled && frameKey ? this.choiceFor(frameKey) : undefined
 		const position = FRAME_POSITIONS.includes(chosen as (typeof FRAME_POSITIONS)[number])
 			? chosen
 			: undefined
-		const key = `${status.media.sourceUri ?? status.media.filename ?? parsed.title}|${season ?? "absolute"}|${episode}|${position ?? "catalog"}`
+		const key = `${status.media.sourceUri ?? status.media.filename ?? parsed.title}|${season ?? "absolute"}|${episode}|${position ?? "catalog"}|${uploadsEnabled}`
 		const cached = this.cache.get(key)
 		if (cached && Date.now() < cached.expiresAt) return cached.value
 		const pending = this.inflight.get(key)
@@ -197,6 +201,7 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 			const image = await this.tvMazeImage(catalog?.title, parsedTitle, season, episode)
 			if (image) return image
 		}
+		if (!this.uploadsEnabled() || !(await this.contentAllowed(status))) return null
 		let frame: Buffer | null
 		try {
 			frame = await this.capture(status, position)
@@ -204,10 +209,10 @@ export class EpisodeThumbnailResolver implements EpisodeThumbnailLookup {
 			logger.warn(`Episode frame capture failed: ${error}`)
 			return null
 		}
-		if (!frame) return null
+		if (!frame || !this.uploadsEnabled() || !(await this.contentAllowed(status))) return null
 		try {
 			const uploaded = await this.uploader.uploadImage(frame, "episode.jpg", 24)
-			return webUrl(uploaded) ? uploaded : null
+			return this.uploadsEnabled() && webUrl(uploaded) ? uploaded : null
 		} catch (error) {
 			logger.warn(`Episode thumbnail upload failed: ${error}`)
 			return null

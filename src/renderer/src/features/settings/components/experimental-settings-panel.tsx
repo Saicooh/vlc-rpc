@@ -37,7 +37,7 @@ export function ExperimentalSettingsPanel({ config }: { config: AppConfig }): JS
 				htmlFor="showEpisodeThumbnails"
 				label={t("Show episode thumbnails")}
 				description={t(
-					"Use an episode image when available. Otherwise, upload a frame from the local video to an image host for Discord.",
+					"Use episode images from catalogs. If local image uploads are allowed, fall back to a frame from your video.",
 				)}
 				control={
 					<Switch

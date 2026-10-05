@@ -1,3 +1,4 @@
+import { LocalArtworkUploadsRow } from "@renderer/components/local-artwork-uploads-row"
 import { Button } from "@renderer/components/ui/button"
 import { useT } from "@renderer/i18n"
 import { Info } from "phosphor-react"
@@ -30,6 +31,8 @@ export function WelcomeStep({ onNext }: WelcomeStepProps): JSX.Element {
 					</p>
 				</div>
 			</div>
+
+			<LocalArtworkUploadsRow />
 
 			<div className="flex justify-end gap-2 pt-4">
 				<Button onClick={onNext}>{t("Get started")}</Button>

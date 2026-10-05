@@ -8,6 +8,7 @@ import type { MediaState } from "./media.store"
  * them survives that file being swapped for another.
  */
 const FORGOTTEN = {
+	privacy: null,
 	contentType: null,
 	contentImageUrl: null,
 	contentImageSourceUrl: null,

@@ -12,8 +12,11 @@ import * as Media from "@main/features/media"
 import * as Music from "@main/features/music"
 import * as Overrides from "@main/features/overrides"
 import * as Presence from "@main/features/presence"
+import { Handler as PrivacyHandler } from "@main/features/privacy/privacy.handler"
+import { Service as PrivacyService } from "@main/features/privacy/privacy.service"
 import * as Updates from "@main/features/updates"
 import * as Vlc from "@main/features/vlc"
+import type { VlcStatus } from "@shared/vlc/vlc.types"
 import { app } from "electron"
 
 declare global {
@@ -67,10 +70,13 @@ if (!gotTheLock) {
 		// Services with no dependency on another feature
 		const systemClock = new SystemClock()
 		const vlc = new Vlc.Client()
+		const privacy = new PrivacyService(vlc, configService)
+		const contentAllowed = async (status: VlcStatus) => !(await privacy.isExcluded(status))
 		const discord = new Discord.Client(systemClock)
 		const imageProxy = new Media.ImageProxy()
 		const coverStore = new Cover.Store()
-		const coverUploader = new Cover.Uploader(app.getVersion())
+		const uploadsEnabled = () => configService.get("allowLocalArtworkUploads") !== false
+		const coverUploader = new Cover.Uploader(app.getVersion(), uploadsEnabled)
 		// Asked once and answered once: the updater decides what it may offer from
 		// this, and start at login is refused for the same copies, so the header
 		// and the settings screen cannot disagree about what this copy is.
@@ -81,7 +87,7 @@ if (!gotTheLock) {
 		const startup = new App.Startup(install)
 
 		// Services that depend on the above
-		const cover = new Cover.Resolver(vlc, coverStore, coverUploader)
+		const cover = new Cover.Resolver(vlc, coverStore, coverUploader, uploadsEnabled, contentAllowed)
 		const overridesStore = new Overrides.Store(systemClock)
 		const catalogCache = new Catalog.Cache(systemClock)
 		const anilist = new Catalog.AniListProvider()
@@ -94,6 +100,8 @@ if (!gotTheLock) {
 			coverUploader,
 			Cover.captureEpisodeFrame,
 			(key) => configService.get("episodeFrameChoices")?.[key],
+			uploadsEnabled,
+			contentAllowed,
 		)
 		const musicCache = new Music.Cache(systemClock)
 		// Identifying audio by its sound needs a key of this application's own,
@@ -140,6 +148,7 @@ if (!gotTheLock) {
 			cover,
 			episodeTitles,
 			episodeThumbnails,
+			contentAllowed,
 		)
 
 		// The tray/window cycle, resolved in fixed order
@@ -150,8 +159,29 @@ if (!gotTheLock) {
 		// Handlers, one per feature
 		new App.AppInfoHandler(startup)
 		new Cover.MetadataHandler(coverStore)
-		const discordRpcHandler = new Discord.DiscordRpcHandler(discord, vlc, presence, systemClock)
-		new Cover.EpisodeFrameHandler(vlc, episodeThumbnails, () => discordRpcHandler.forceNextUpdate())
+		const discordRpcHandler = new Discord.DiscordRpcHandler(
+			discord,
+			vlc,
+			presence,
+			systemClock,
+			privacy,
+		)
+		new PrivacyHandler(privacy, vlc, async () => {
+			coverUploader.cancelUploads()
+			episodeThumbnails.clearCache()
+			return discordRpcHandler.refreshPrivacy()
+		})
+		configService.onChange("allowLocalArtworkUploads", () => {
+			if (!uploadsEnabled()) coverUploader.cancelUploads()
+			episodeThumbnails.clearCache()
+			discordRpcHandler.forceNextUpdate()
+		})
+		new Cover.EpisodeFrameHandler(
+			vlc,
+			episodeThumbnails,
+			() => discordRpcHandler.forceNextUpdate(),
+			contentAllowed,
+		)
 		new Media.MediaInfoHandler(
 			artwork,
 			catalogResolver,
@@ -166,8 +196,10 @@ if (!gotTheLock) {
 				discordRpcHandler.forceNextUpdate()
 			},
 			(key) =>
+				uploadsEnabled() &&
 				configService.get("showEpisodeThumbnails") === true &&
 				configService.get("episodeFrameChoices")?.[key] !== undefined,
+			privacy,
 		)
 		// Both resolvers, because the key alone does not say which cache holds what
 		// the correction replaces. The rpc handler, because evicting a cache does

@@ -11,6 +11,7 @@ import type { CorrectionRow } from "../media.format"
 import { audioMatchRow, contentTypeLabel, correctionSummary, formatDuration } from "../media.format"
 import type { MediaState } from "../media.store"
 import { correctionStore, mediaStore } from "../media.store"
+import { ContentVisibility } from "./content-visibility"
 import { EpisodeFramePicker } from "./episode-frame-picker"
 import { OverrideForm } from "./override-form"
 
@@ -78,6 +79,7 @@ export function SourcePanel(): JSX.Element {
 
 	return (
 		<div className="flex flex-col gap-3">
+			<ContentVisibility media={media} />
 			<Panel label={t("What VLC reports")}>
 				{rows.map((row) => (
 					<Row
@@ -199,7 +201,7 @@ export function SourcePanel(): JSX.Element {
 
 			<EpisodeFramePicker media={media} />
 
-			{!overrideKey && (
+			{!overrideKey && !media.privacy?.hidden && (
 				<p className="type-caption text-pretty text-muted-foreground">
 					{isAudio
 						? t("This is not a file on disk, so there is nothing to file a correction against.")

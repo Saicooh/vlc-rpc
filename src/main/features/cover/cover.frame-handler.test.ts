@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const { handlers, settings, capture } = vi.hoisted(() => ({
 	handlers: new Map<string, (...args: unknown[]) => unknown>(),
-	settings: { showEpisodeThumbnails: true, episodeFrameChoices: {} as Record<string, number> },
+	settings: {
+		showEpisodeThumbnails: true,
+		allowLocalArtworkUploads: true,
+		episodeFrameChoices: {} as Record<string, number>,
+	},
 	capture: vi.fn(async (_status: VlcStatus, position: number) => Buffer.from(String(position))),
 }))
 
@@ -53,10 +57,26 @@ beforeEach(() => {
 	handlers.clear()
 	capture.mockClear()
 	settings.showEpisodeThumbnails = true
+	settings.allowLocalArtworkUploads = true
 	settings.episodeFrameChoices = {}
 })
 
 describe("EpisodeFrameHandler", () => {
+	it("refuses frame previews and selection while local uploads are disabled", async () => {
+		settings.allowLocalArtworkUploads = false
+		const vlc = { readStatus: vi.fn(async () => status()) }
+		const thumbnails = { clearCache: vi.fn(), resolve: vi.fn() }
+		new EpisodeFrameHandler(
+			vlc as unknown as VlcClient,
+			thumbnails as unknown as ConstructorParameters<typeof EpisodeFrameHandler>[1],
+			vi.fn(),
+		)
+		expect(await invoke("media:preview-frames")).toBeNull()
+		expect(await invoke("media:select-frame", "current-episode", 0.4)).toBe(false)
+		expect(capture).not.toHaveBeenCalled()
+		expect(vlc.readStatus).not.toHaveBeenCalled()
+	})
+
 	it("keeps previews local until a frame is chosen and checks the active episode", async () => {
 		let current = status()
 		const vlc = { readStatus: vi.fn(async () => current) }

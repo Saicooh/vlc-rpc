@@ -333,6 +333,7 @@ function videoService(
 	episodeThumbnails?: {
 		resolve: (status: VlcStatus, result: CatalogResult | null) => Promise<string | null>
 	},
+	contentAllowed?: (status: VlcStatus) => Promise<boolean>,
 ): Service {
 	const artwork = new ArtworkResolver(
 		{
@@ -362,6 +363,7 @@ function videoService(
 		localVideoArtwork,
 		episodeTitles,
 		episodeThumbnails,
+		contentAllowed,
 	)
 }
 
@@ -409,6 +411,33 @@ describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 			const presence = await pending
 			expect(presence?.large_image).toBe(PUBLISHED_COVER)
 			expect(presence?.state).toBe("S2E5 · The Long Night")
+			expect(thumbnail).not.toHaveBeenCalled()
+		})
+
+		it("discards parallel lookup results when the content is hidden before they finish", async () => {
+			let allowed = true
+			let finish!: (value: VideoCoverResult) => void
+			const videoArtwork = vi.fn(
+				() =>
+					new Promise<VideoCoverResult>((resolve) => {
+						finish = resolve
+					}),
+			)
+			const thumbnail = vi.fn(async () => "https://example.test/episode.jpg")
+			config.current = { ...BASE_CONFIG, showEpisodeThumbnails: true }
+			const pending = videoService(
+				SERIES,
+				{ resolve: videoArtwork },
+				undefined,
+				undefined,
+				undefined,
+				{ resolve: thumbnail },
+				async () => allowed,
+			).getDiscordPresence(videoStatus("Breaking.Bad.S02E05.mkv", state), timeline)
+			await vi.waitFor(() => expect(videoArtwork).toHaveBeenCalledOnce())
+			allowed = false
+			finish({ imageUrl: CATALOG_COVER, sourceUrl: null, sourceName: null, canonicalTitle: null })
+			expect(await pending).toBeNull()
 			expect(thumbnail).not.toHaveBeenCalled()
 		})
 

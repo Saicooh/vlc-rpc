@@ -1,4 +1,5 @@
 import type { StoredMusicLayout, StoredVideoLayout } from "@shared/presence/layout"
+import type { ContentExclusion } from "@shared/privacy/privacy.types"
 
 export interface VlcConfig {
 	httpPort: number
@@ -14,6 +15,8 @@ export interface FileMetadata {
 }
 
 export interface AppConfig {
+	/** Local files and folders whose content must stay off Discord. */
+	contentExclusions?: ContentExclusion[]
 	largeImage: string
 	pausedImage: string
 	playingImage: string
@@ -33,6 +36,8 @@ export interface AppConfig {
 	preferSpanishEpisodeTitles?: boolean
 	/** Show episode artwork or an uploaded video frame in Discord. */
 	showEpisodeThumbnails?: boolean
+	/** Allow embedded artwork and video frames to be uploaded to public image hosts. */
+	allowLocalArtworkUploads?: boolean
 	/** A chosen local frame position, keyed by the episode's file URI. */
 	episodeFrameChoices?: Record<string, number>
 	/** Language of the application window; Discord metadata uses its own preference. */

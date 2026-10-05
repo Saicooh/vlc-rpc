@@ -2,6 +2,7 @@ import type { AppConfig } from "@shared/config/app-config"
 import { DEFAULT_MUSIC_CHOICE, DEFAULT_VIDEO_CHOICE } from "@shared/presence/layout"
 
 export const DEFAULT_CONFIG: AppConfig = {
+	contentExclusions: [],
 	largeImage: "logo",
 	pausedImage: "paused",
 	playingImage: "playing",
@@ -21,6 +22,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	hideActivityWhenPaused: false,
 	preferSpanishEpisodeTitles: false,
 	showEpisodeThumbnails: false,
+	allowLocalArtworkUploads: true,
 	episodeFrameChoices: {},
 	interfaceLanguage: "en",
 	customButtonEnabled: false,

@@ -1,6 +1,7 @@
 import type { Resolver as CatalogResolver, CatalogResult } from "@main/features/catalog"
 import type { CoverOutcome } from "@main/features/cover"
 import type { MusicResult } from "@main/features/music"
+import { Service as PrivacyService, localPath } from "@main/features/privacy/privacy.service"
 import type { Client as VlcClient } from "@main/features/vlc"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -61,6 +62,7 @@ function build(
 	target: OverrideTarget | null = null,
 	proxied: string | null = null,
 	corrected: CorrectedTags | null = null,
+	privacy?: PrivacyService,
 ) {
 	const calls = { fetch: 0, resolve: 0 }
 	const artwork = new ArtworkResolver(
@@ -104,6 +106,7 @@ function build(
 			undefined,
 			undefined,
 			undefined,
+			privacy,
 		),
 		calls,
 		readStatus,
@@ -120,6 +123,27 @@ describe("MediaInfoHandler audio artwork", () => {
 		expect(proxyImage).not.toHaveBeenCalled()
 		await mediaRead.handler?.()
 		expect(readStatus).toHaveBeenCalledOnce()
+	})
+	it("reports an excluded file locally without artwork uploads or catalog lookups", async () => {
+		const uri = "file:///C:/Private/track.mp3"
+		const path = localPath(uri)
+		if (!path) throw new Error("Fixture URI is invalid")
+		const privacy = new PrivacyService(
+			{ getCurrentFileUri: async () => uri },
+			{ get: () => [{ kind: "file", path }], set: () => {} },
+		)
+		const { handler, calls } = build(
+			{ kind: "published", url: PUBLISHED_COVER },
+			catalogHit,
+			null,
+			null,
+			null,
+			privacy,
+		)
+		const info = await handler.getMediaInfo(status(LOCAL_ARTWORK))
+		expect(info?.content_privacy?.hidden).toBe(true)
+		expect(info?.content_image_url).toBeUndefined()
+		expect(calls).toEqual({ fetch: 0, resolve: 0 })
 	})
 	it("reports the published artwork and consults no catalog", async () => {
 		const { handler, calls } = build({ kind: "published", url: PUBLISHED_COVER })

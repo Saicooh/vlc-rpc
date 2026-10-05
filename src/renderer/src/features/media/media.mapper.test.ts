@@ -4,6 +4,7 @@ import { mergeVlcStatus, stampsAgree } from "./media.mapper"
 import type { MediaState } from "./media.store"
 
 const EMPTY: MediaState = {
+	privacy: null,
 	playlistId: null,
 	nameSource: null,
 	mediaStatus: "stopped",
@@ -61,6 +62,27 @@ function resolved(): MediaState {
 }
 
 describe("mergeVlcStatus", () => {
+	it("forgets privacy and enrichment when equal audio titles belong to different playlist items", () => {
+		const first = playing({ title: "Clip" })
+		first.mediaType = "audio"
+		const previous = {
+			...mergeVlcStatus(EMPTY, first),
+			title: "Resolved Clip",
+			sourceUri: "file:///C:/Private/Clip.mp3",
+			privacy: {
+				sourceUri: "file:///C:/Private/Clip.mp3",
+				path: "C:\\Private\\Clip.mp3",
+				folder: "C:\\Private",
+				exclusion: null,
+				hidden: false,
+			},
+		}
+		const next = mergeVlcStatus(previous, { ...first, plid: 2 })
+		expect(next.privacy).toBeNull()
+		expect(next.sourceUri).toBeNull()
+		expect(next.title).toBe("Clip")
+		expect(mergeVlcStatus(previous, first).sourceUri).toBe(previous.sourceUri)
+	})
 	it("updates the current Blu-Ray chapter while the disc keeps playing", () => {
 		const disc = playing({ title: "The Matrix" })
 		const first = mergeVlcStatus(EMPTY, { ...disc, disc: { title: 1, chapter: 1 } })

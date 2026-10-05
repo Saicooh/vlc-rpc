@@ -5,6 +5,37 @@ export type Language = "en" | "es"
 
 /** English is the source language and the fallback for every missing entry. */
 const ES: Record<string, string> = {
+	"Discord visibility": "Visibilidad en Discord",
+	"Checking the playing file before sharing it.":
+		"Comprobando el archivo en reproducción antes de compartirlo.",
+	"This content is hidden from Discord": "Este contenido está oculto en Discord",
+	"This content can appear on Discord": "Este contenido puede aparecer en Discord",
+	"Hide this file": "Ocultar este archivo",
+	"Exclude this folder": "Excluir esta carpeta",
+	"Show this file again": "Volver a mostrar este archivo",
+	"Stop excluding this folder": "Dejar de excluir esta carpeta",
+	"This folder and its subfolders are excluded.": "Esta carpeta y sus subcarpetas están excluidas.",
+	"Folder exclusions also cover subfolders. Manage exclusions in Settings.":
+		"Las exclusiones de carpetas incluyen sus subcarpetas. Puedes gestionarlas en Configuración.",
+	"File exclusions are available for local files.":
+		"Puedes excluir archivos cuando reproduces archivos locales.",
+	"Updating visibility": "Actualizando visibilidad",
+	"Could not change visibility. The playing file may have changed. Try again.":
+		"No se pudo cambiar la visibilidad. Puede que el archivo en reproducción haya cambiado. Inténtalo de nuevo.",
+	"Hidden content": "Contenido oculto",
+	"No files or folders are excluded.": "No hay archivos ni carpetas excluidos.",
+	"Folder and subfolders": "Carpeta y subcarpetas",
+	"Remove exclusion": "Eliminar exclusión",
+	"Remove exclusion for {path}": "Eliminar exclusión de {path}",
+	"Could not remove the exclusion. Try again.":
+		"No se pudo eliminar la exclusión. Inténtalo de nuevo.",
+	"Allow local image uploads": "Permitir subir imágenes locales",
+	"Upload embedded artwork and video frames to public image hosts for Discord. Turn off to use catalog images or the default icon. This does not delete images already uploaded.":
+		"Sube portadas incrustadas y fotogramas a servicios públicos para mostrarlos en Discord. Desactívalo para usar imágenes de catálogos o el icono predeterminado. No elimina imágenes ya subidas.",
+	"Could not save the upload setting. Try again.":
+		"No se pudo guardar la opción de subida. Inténtalo de nuevo.",
+	"Use episode images from catalogs. If local image uploads are allowed, fall back to a frame from your video.":
+		"Usa imágenes de episodios de los catálogos. Si permites subir imágenes locales, puede usar un fotograma del vídeo como alternativa.",
 	Home: "Inicio",
 	Layout: "Diseño",
 	Settings: "Configuración",

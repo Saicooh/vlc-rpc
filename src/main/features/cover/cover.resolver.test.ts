@@ -145,6 +145,59 @@ describe("Resolver outcomes", () => {
 		expect(uploadImage).toHaveBeenCalledOnce()
 	})
 
+	it("does not retain a cancelled shared upload after the user enables uploads again", async () => {
+		let enabled = true
+		let finish!: (url: string) => void
+		const uploadImage = vi
+			.fn()
+			.mockImplementationOnce(
+				() =>
+					new Promise<string>((resolve) => {
+						finish = resolve
+					}),
+			)
+			.mockResolvedValue("https://example.test/retry.jpg")
+		const resolver = new Resolver(fakeVlc(), fakeStore(), fakeUploader(uploadImage), () => enabled)
+		const playing = status({ title: "Song", artworkUrl })
+		const first = resolver.fetch(playing)
+		const second = resolver.fetch(playing)
+		await vi.waitFor(() => expect(uploadImage).toHaveBeenCalledOnce())
+		enabled = false
+		finish("https://example.test/old.jpg")
+		expect(await first).toEqual({ kind: "uploads-disabled" })
+		expect(await second).toEqual({ kind: "uploads-disabled" })
+		enabled = true
+		expect(await resolver.fetch(playing)).toEqual({
+			kind: "published",
+			url: "https://example.test/retry.jpg",
+		})
+	})
+
+	it("blocks cached local artwork while disabled and resumes when enabled", async () => {
+		let enabled = true
+		const uploadImage = vi.fn(async () => "https://example.test/local.jpg")
+		const resolver = new Resolver(fakeVlc(), fakeStore(), fakeUploader(uploadImage), () => enabled)
+		const playing = status({ title: "Song", artworkUrl })
+		expect(await resolver.fetch(playing)).toEqual({
+			kind: "published",
+			url: "https://example.test/local.jpg",
+		})
+		enabled = false
+		expect(await resolver.fetch(playing)).toEqual({ kind: "uploads-disabled" })
+		expect(uploadImage).toHaveBeenCalledTimes(1)
+		enabled = true
+		expect((await resolver.fetch(playing)).kind).toBe("published")
+	})
+
+	it("does not read or upload local artwork when disabled", async () => {
+		const vlc = { getCurrentFileUri: vi.fn() } as unknown as VlcClient
+		const uploadImage = vi.fn()
+		const resolver = new Resolver(vlc, fakeStore(), fakeUploader(uploadImage), () => false)
+		expect(await resolver.fetch(status({ artworkUrl }))).toEqual({ kind: "uploads-disabled" })
+		expect(vlc.getCurrentFileUri).not.toHaveBeenCalled()
+		expect(uploadImage).not.toHaveBeenCalled()
+	})
+
 	it("publishes the artwork embedded in the file and reports its url", async () => {
 		const uploader = fakeUploader(async () => "https://0x0.st/cover.jpg")
 		const resolver = new Resolver(fakeVlc(), fakeStore(), uploader)
