@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.3.0
+
+### Minor Changes
+
+- d6e3c48: Recognize anime in plain filenames, search once for missing sequel seasons, and keep season and arc posters separate. Shared pending lookups preserve each file's episode number. Music searches ignore explicit remaster labels while retaining live and remix identities.
+- 90a57d5: Hide individual local files or exclude folders and their subfolders from Discord. Manage saved exclusions from Home and Settings in English or Spanish. Clear existing activity, skip new lookups and uploads for hidden content, and discard late presence results.
+- 90a57d5: Local image uploads can now be turned off during first run or in Settings. Embedded cover art and
+  video frames then stay on the computer, while Discord uses catalog images or the default icon.
+  Turning the option off cancels uploads in progress and stops using cached local artwork links.
+  Images already uploaded remain subject to the image host's retention policy.
+
+### Patch Changes
+
+- 9b9e5f0: Recognize numbered anime films such as Madoka Movie III: remove Blu-ray filename metadata before parsing, match Roman and numeric film aliases, and search the franchise once when the full title finds no matching film. Catalog titles and artwork require the same franchise and film number. Refresh cached results from the previous matching logic.
+- 906cd4f: Keep checking VLC while artwork and metadata are being resolved, and discard results for media
+  that has changed or stopped. Concurrent requests now share artwork uploads and image downloads.
+  Independent video artwork and episode title lookups run in parallel.
+  The interface reuses the status it already read and requests image bytes only when the artwork
+  changes. Image previews have an eight-second timeout and an 8 MiB size limit.
+
 ## 5.2.0
 
 ### Minor Changes
