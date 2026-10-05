@@ -1,4 +1,5 @@
 import { filenameParse } from "@ctrl/video-filename-parser"
+import { readNumberedMovie } from "./catalog.movie"
 import type { ParsedVideo } from "./catalog.types"
 
 type ParsedFilename = import("@ctrl/video-filename-parser").ParsedFilename
@@ -13,6 +14,10 @@ const TRAILING_EMPTY_BRACKETS = /\s*\[\s*\]\s*$/
 const TRAILING_OPEN_BRACKET = /\s*[([{]\s*$/
 const TRAILING_FORMAT_DESCRIPTOR = /[-–—]\s*(?:the\s+movie|movie|film|ova|ona|sp|specials?)\s*$/i
 const VIDEO_EXTENSION = /\.(mkv|mp4|avi|wmv|flv|webm|m4v|mov|ts|mpg|mpeg)$/i
+// Remove complete technical blocks before the library truncates at a resolution
+// or codec inside them, leaving fragments such as "(BD" attached to the title.
+const PAREN_RELEASE_METADATA =
+	/\((?:BD|BDRIP|BLU-RAY|BLURAY|WEB(?:-DL|RIP)?|\d{3,4}p|\d{3,4}x\d{3,4}|x26[45]|HEVC|AAC|FLAC)\b[^)]*\)/gi
 const EPISODE_MARKER = /\bS\d{1,2}E\d{1,3}\b/i
 const TRAILING_ABSOLUTE_EPISODE = /\s[-–—]\s*(\d{1,3})\s*$/
 const EPISODE_RELEASE_NOISE =
@@ -67,6 +72,7 @@ function takeTrailingAbsoluteEpisode(
 function cleanTitle(raw: string): string {
 	return (
 		raw
+			.replace(VIDEO_EXTENSION, "")
 			// The library stripped the release group itself up to 5.4.1 and stopped
 			// doing it later, so relying on that put "[SubsPlease]" in a title the
 			// moment the range resolved higher. Ours to remove, in one regex we own.
@@ -115,14 +121,15 @@ function toYear(raw: string | null | undefined): number | undefined {
 }
 
 export function parse(filename: string, durationSeconds = 0): ParsedVideo {
-	const actualFilename = stripDirectory(filename).replace(/_+/g, " ")
+	const actualFilename = stripDirectory(filename)
+		.replace(/_+/g, " ")
+		.replace(PAREN_RELEASE_METADATA, " ")
 	const signal = classifySignal(actualFilename)
 	const likelyTvShow = durationSeconds > 0 && durationSeconds < TV_DURATION_LIMIT_SECONDS
 	const treatAsTv =
-		signal === "fansub" ||
-		signal === "ambiguous" ||
 		SEASON_EPISODE.test(actualFilename) ||
-		likelyTvShow
+		(!readNumberedMovie(actualFilename) &&
+			(signal === "fansub" || signal === "ambiguous" || likelyTvShow))
 
 	let parsed = filenameParse(actualFilename, treatAsTv)
 	let season: number | undefined

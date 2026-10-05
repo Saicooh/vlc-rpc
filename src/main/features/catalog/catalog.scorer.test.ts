@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import madoka from "./__fixtures__/anilist-madoka-candidates.json"
 import { pickBest } from "./catalog.scorer"
 import type { Candidate, ParsedVideo } from "./catalog.types"
 
@@ -17,6 +18,43 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
 		...overrides,
 	}
 }
+
+describe("pickBest, numbered movies", () => {
+	const movies = madoka as Candidate[]
+	it.each(["III", "3", "Part III"])(
+		"identifies Rebellion from Movie %s and AniList aliases",
+		(number) => {
+			expect(
+				pickBest(
+					parsed({ title: `Mahou Shoujo Madoka Magica the Movie ${number} - Rebellion` }),
+					movies,
+				)?.id,
+			).toBe("11981")
+		},
+	)
+
+	it.each([1, 2, 4])("keeps Movie %s distinct from Rebellion", (number) => {
+		const expected = { 1: "11977", 2: "11979", 4: "133007" }[number]
+		expect(
+			pickBest(parsed({ title: `Puella Magi Madoka Magica Movie ${number}` }), movies)?.id,
+		).toBe(expected)
+	})
+
+	it("rejects the TV series and the other films when Rebellion is absent", () => {
+		expect(
+			pickBest(
+				parsed({ title: "Mahou Shoujo Madoka Magica the Movie III - Rebellion" }),
+				movies.filter(({ id }) => id !== "11981"),
+			),
+		).toBeNull()
+	})
+
+	it("requires the same franchise even with a matching movie number and subtitle", () => {
+		expect(
+			pickBest(parsed({ title: "Unrelated Franchise Movie III - Rebellion" }), movies),
+		).toBeNull()
+	})
+})
 
 describe("pickBest, identity gate", () => {
 	it("picks an exact title match", () => {

@@ -1,0 +1,93 @@
+[
+	{
+		"provider": "anilist",
+		"id": "9756",
+		"title": "Mahou Shoujo Madoka☆Magica",
+		"aliases": [
+			"Puella Magi Madoka Magica",
+			"魔法少女まどか☆マギカ",
+			"Mahou Shoujo Madoka Magika",
+			"Magical Girl Madoka Magica",
+			"PMMM",
+			"MSMM",
+			"הנערה הקסומה מאדוקה מאגיקה",
+			"Девочка-волшебница Мадока☆Волшебство",
+			"Μάντοκα, το Μαγικό Κορίτσι",
+			"สาวน้อยเวทมนตร์ มาโดกะ",
+			"魔法少女小圓"
+		],
+		"year": 2011,
+		"mediaKind": "tv",
+		"posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx9756-QnUGwlwwnsuN.jpg",
+		"sourceUrl": "https://anilist.co/anime/9756",
+		"sourceName": "AniList"
+	},
+	{
+		"provider": "anilist",
+		"id": "11981",
+		"title": "Mahou Shoujo Madoka☆Magica: Hangyaku no Monogatari",
+		"aliases": [
+			"Puella Magi Madoka Magica the Movie -Rebellion-",
+			"劇場版 魔法少女まどか☆マギカ 叛逆の物語",
+			"Mahou Shoujo Madoka Magika Movie 3",
+			"Magical Girl Madoka Magica Movie 3",
+			"Puella Magi Madoka Magica the Movie Part III: Rebellion",
+			"Puella Magi Madoka Magica the Movie: Rebellion"
+		],
+		"year": 2013,
+		"mediaKind": "movie",
+		"posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/b11981-koz1IoISs3eU.jpg",
+		"sourceUrl": "https://anilist.co/anime/11981",
+		"sourceName": "AniList"
+	},
+	{
+		"provider": "anilist",
+		"id": "133007",
+		"title": "Mahou Shoujo Madoka☆Magica: Walpurgis no Kaiten",
+		"aliases": [
+			"Puella Magi Madoka Magica the Movie -Walpurgisnacht: Rising-",
+			"劇場版 魔法少女まどか☆マギカ〈ワルプルギスの廻天〉",
+			"Magical Girl Madoka Magica Movie 4",
+			"Puella Magi Madoka Magica Movie 4"
+		],
+		"year": 2026,
+		"mediaKind": "movie",
+		"posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx133007-5gOUXDvzxy9S.jpg",
+		"sourceUrl": "https://anilist.co/anime/133007",
+		"sourceName": "AniList"
+	},
+	{
+		"provider": "anilist",
+		"id": "11979",
+		"title": "Mahou Shoujo Madoka☆Magica: Eien no Monogatari",
+		"aliases": [
+			"Puella Magi Madoka Magica the Movie Part 2: Eternal",
+			"劇場版 魔法少女まどか☆マギカ 永遠の物語",
+			"Mahou Shoujo Madoka Magika Movie 2",
+			"Magical Girl Madoka Magica Movie 2",
+			"Puella Magi Madoka Magica the Movie Part II: Eternal"
+		],
+		"year": 2012,
+		"mediaKind": "movie",
+		"posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx11979-oiKvt5UXyREg.jpg",
+		"sourceUrl": "https://anilist.co/anime/11979",
+		"sourceName": "AniList"
+	},
+	{
+		"provider": "anilist",
+		"id": "11977",
+		"title": "Mahou Shoujo Madoka☆Magica: Hajimari no Monogatari",
+		"aliases": [
+			"Puella Magi Madoka Magica the Movie Part 1: Beginnings",
+			"劇場版 魔法少女まどか☆マギカ 始まりの物語",
+			"Mahou Shoujo Madoka Magika Movie 1",
+			"Magical Girl Madoka Magica Movie 1",
+			"Puella Magi Madoka Magica the Movie Part I: Beginnings"
+		],
+		"year": 2012,
+		"mediaKind": "movie",
+		"posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx11977-HxMeU4kjzSnE.png",
+		"sourceUrl": "https://anilist.co/anime/11977",
+		"sourceName": "AniList"
+	}
+]

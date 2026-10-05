@@ -87,11 +87,11 @@ describe("Cache", () => {
 		expect(entry).not.toBeNull()
 	})
 
-	it("treats an entry written by an older cache version as a miss", () => {
+	it.each([0, 1, 2])("treats an entry written by cache version %s as a miss", (version) => {
 		const cache = new Cache(new FakeClock())
 		const stale: CacheEntry = {
 			status: "resolved",
-			version: 0,
+			version,
 			work: { title: "Show", poster: null, mediaKind: "tv" },
 			lastAccessedAt: 0,
 		}

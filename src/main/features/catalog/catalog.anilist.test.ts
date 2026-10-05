@@ -6,6 +6,7 @@ vi.mock("@main/core/logger", () => ({
 	logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }))
 
+import madoka from "./__fixtures__/anilist-madoka-candidates.json"
 import { AniListProvider } from "./catalog.anilist"
 import type { Candidate } from "./catalog.types"
 
@@ -26,6 +27,36 @@ afterEach(() => {
 })
 
 describe("AniListProvider", () => {
+	it.each([undefined, 2013])(
+		"uses the same numbered movie identity for artwork with year %s",
+		async (year) => {
+			const provider = new AniListProvider()
+			const search = vi
+				.spyOn(provider, "search")
+				.mockImplementation(async (title) =>
+					title === "Mahou Shoujo Madoka Magica" ? (madoka as Candidate[]) : [],
+				)
+			const title = "Mahou Shoujo Madoka Magica the Movie III - Rebellion"
+			expect((await provider.searchBest(title, { title, year, signal: "fansub" }))?.id).toBe(
+				"11981",
+			)
+			expect(search.mock.calls.map(([value]) => value)).toEqual([
+				title,
+				"Mahou Shoujo Madoka Magica",
+			])
+		},
+	)
+
+	it("rejects artwork for the TV series or another numbered movie", async () => {
+		const provider = new AniListProvider()
+		vi.spyOn(provider, "search").mockResolvedValue(
+			madoka.filter(({ id }) => id !== "11981") as Candidate[],
+		)
+		expect(
+			await provider.searchBest("Mahou Shoujo Madoka Magica the Movie III - Rebellion"),
+		).toBeNull()
+	})
+
 	it("does not let the artwork fallback accept a title with a conflicting film year", async () => {
 		const provider = new AniListProvider()
 		vi.spyOn(provider, "search").mockResolvedValue([

@@ -4,6 +4,7 @@ import { bluRayFolderTitle, isBluRaySource } from "@shared/vlc/bluray"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
 import type { Cache } from "./catalog.cache"
 import { catalogKey } from "./catalog.key"
+import { readNumberedMovie } from "./catalog.movie"
 import { parse } from "./catalog.parser"
 import { matchesSeason, pickBest } from "./catalog.scorer"
 import type {
@@ -166,6 +167,18 @@ export class Resolver {
 		const providers = [this.anilist]
 		const { candidates, allFailed } = await this.searchProviders(providers, parsed)
 		let best = pickBest(parsed, candidates)
+		const movie = readNumberedMovie(parsed.title)
+		if (!allFailed && !best && movie) {
+			// AniList may index the film under its translated subtitle. Search the
+			// franchise once, then score its aliases against the original film number.
+			const franchise = await this.searchProviders(providers, { ...parsed, title: movie.series })
+			if (franchise.allFailed) {
+				this.cache.setUnresolved(key, "provider-error")
+				return null
+			}
+			candidates.push(...franchise.candidates)
+			best = pickBest(parsed, candidates)
+		}
 		// A base-title search can fill its first page with the original season.
 		// Ask once for the named sequel before accepting that franchise fallback.
 		if (

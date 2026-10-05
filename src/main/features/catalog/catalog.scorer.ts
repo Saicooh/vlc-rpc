@@ -1,4 +1,5 @@
 import { diceSimilarity, normalize } from "@main/core/similarity"
+import { type NumberedMovie, readNumberedMovie } from "./catalog.movie"
 import type { Candidate, ParsedVideo } from "./catalog.types"
 
 const IDENTITY_GATE_THRESHOLD = 0.92
@@ -107,6 +108,17 @@ function bestSimilarity(target: string, names: string[]): number {
 	return best
 }
 
+function numberedMovieSimilarity(target: NumberedMovie, candidate: Candidate): number {
+	if (candidate.mediaKind !== "movie") return 0
+	let best = 0
+	for (const name of [candidate.title, ...candidate.aliases]) {
+		const movie = readNumberedMovie(name)
+		if (!movie || movie.number !== target.number) continue
+		best = Math.max(best, diceSimilarity(normalize(target.series), normalize(movie.series)))
+	}
+	return best
+}
+
 function isHardExcluded(parsed: ParsedVideo, candidate: Candidate): boolean {
 	const hasEpisodeInfo = parsed.season !== undefined || parsed.episode !== undefined
 	// Ungrouped filenames can name a western work with the same title as an
@@ -141,6 +153,7 @@ function mediaKindScore(parsed: ParsedVideo, candidate: Candidate): number {
 
 export function pickBest(parsed: ParsedVideo, candidates: Candidate[]): Candidate | null {
 	const target = normalize(parsed.title)
+	const movie = readNumberedMovie(parsed.title)
 	// A file that names no season is playing season 1: that is the convention
 	// the catalogs themselves follow when they leave the marker off an entry.
 	const expectedSeason = parsed.season ?? 1
@@ -152,9 +165,13 @@ export function pickBest(parsed: ParsedVideo, candidates: Candidate[]): Candidat
 		if (isHardExcluded(parsed, candidate)) continue
 
 		const identity = identityOf(candidate)
-		const seasonMatches = identity.season === expectedSeason
-		const nameSimilarity = bestSimilarity(target, identity.names)
-		const baseSimilarity = bestSimilarity(target, identity.baseNames)
+		const seasonMatches = movie !== null || identity.season === expectedSeason
+		// A numbered film must match both its franchise and its ordinal. Whole
+		// title similarity alone can let Movie 4 win a search for Movie 1.
+		const nameSimilarity = movie
+			? numberedMovieSimilarity(movie, candidate)
+			: bestSimilarity(target, identity.names)
+		const baseSimilarity = movie ? 0 : bestSimilarity(target, identity.baseNames)
 
 		// The gate is the same rule it has always been, plus one door: an entry
 		// whose title is the parsed one once its own season marker is read off,

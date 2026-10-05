@@ -100,6 +100,42 @@ describe("parse, bare season markers the library does not read", () => {
 })
 
 describe("parse, fansub naming of movies", () => {
+	it.each(["", ".mkv"])("cleans the Madoka Movie III release with extension %s", (extension) => {
+		const result = parse(
+			`[FS] Mahou Shoujo Madoka Magica the Movie III - Rebellion (BD 1920x1080 x264 AAC)[35F2E72D]${extension}`,
+			6960,
+		)
+		expect(result).toEqual({
+			title: "Mahou Shoujo Madoka Magica the Movie III - Rebellion",
+			subtitle: undefined,
+			season: undefined,
+			episode: undefined,
+			year: undefined,
+			signal: "fansub",
+		})
+	})
+
+	it("preserves the film year while removing parenthesized Blu-ray metadata", () => {
+		const result = parse("[FS] Madoka Movie III - Rebellion (2013) (BD 1920x1080 x264 AAC).mkv")
+		expect(result.title).toBe("Madoka Movie III - Rebellion")
+		expect(result.year).toBe(2013)
+		expect(result.episode).toBeUndefined()
+	})
+
+	it("does not mistake Movie Part 3 for an episode", () => {
+		const result = parse("[FS] Madoka Movie Part 3 - Rebellion (BD 1920x1080 x264 AAC).mkv")
+		expect(result.title).toBe("Madoka Movie Part 3 - Rebellion")
+		expect(result.season).toBeUndefined()
+		expect(result.episode).toBeUndefined()
+	})
+
+	it("preserves meaningful parentheses inside the movie title", () => {
+		const result = parse(
+			"[FS] Show (The Beginning) Movie III - Rebellion (BD 1920x1080 x264 AAC).mkv",
+		)
+		expect(result.title).toBe("Show (The Beginning) Movie III - Rebellion")
+	})
+
 	it("falls back to a movie parse when the TV attempt found no episode", () => {
 		const result = parse("[EMBER] Suzume no Tojimari (2022) [BDRip 1080p HEVC].mkv")
 		expect(result.title).toBe("Suzume no Tojimari")

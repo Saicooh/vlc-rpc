@@ -1,5 +1,6 @@
 import { logger } from "@main/core/logger"
 import { buildAnilistSearchCandidates, findBestAnilistMatch } from "./catalog.anilist-matcher"
+import { readNumberedMovie } from "./catalog.movie"
 import { matchesSeason, pickBest } from "./catalog.scorer"
 import type { Candidate, CatalogProvider, ParsedVideo } from "./catalog.types"
 
@@ -71,16 +72,20 @@ export class AniListProvider implements CatalogProvider {
 
 	/** Search the title variants used by the legacy video cover matcher. */
 	public async searchBest(title: string, context?: ParsedVideo): Promise<Candidate | null> {
+		const movie = readNumberedMovie(title)
 		if (
-			context &&
-			!context.subtitle &&
-			(context.season !== undefined || context.year !== undefined)
+			movie ||
+			(context && !context.subtitle && (context.season !== undefined || context.year !== undefined))
 		) {
-			const parsed = { ...context, title }
+			const parsed: ParsedVideo = { signal: "fansub", ...context, title }
 			const candidates = await this.search(title)
 			let best = pickBest(parsed, candidates)
+			if (!best && movie) {
+				const franchise = await this.search(movie.series)
+				best = pickBest(parsed, [...candidates, ...franchise])
+			}
 			if (
-				context.season !== undefined &&
+				context?.season !== undefined &&
 				context.season > 1 &&
 				(!best || !matchesSeason(parsed, best))
 			) {

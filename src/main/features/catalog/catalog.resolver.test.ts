@@ -6,6 +6,7 @@ vi.mock("@main/core/logger", () => ({
 }))
 
 import type { VideoOverride } from "@main/features/overrides"
+import madoka from "./__fixtures__/anilist-madoka-candidates.json"
 import type { Cache } from "./catalog.cache"
 import { type OverrideSource, Resolver } from "./catalog.resolver"
 import type { CacheEntry, Candidate, CatalogProvider } from "./catalog.types"
@@ -138,6 +139,53 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
 }
 
 describe("Resolver.resolve", () => {
+	it("recognizes the reported Madoka release with one franchise fallback and caches its poster", async () => {
+		const { cache, calls } = fakeCache()
+		const search = vi.fn(async (title: string) =>
+			title === "Mahou Shoujo Madoka Magica" ? (madoka as Candidate[]) : [],
+		)
+		const resolver = new Resolver(cache, { search }, noOverrides())
+		const file = status(
+			"[FS] Mahou Shoujo Madoka Magica the Movie III - Rebellion (BD 1920x1080 x264 AAC)[35F2E72D].mkv",
+		)
+		const result = await resolver.resolve(file)
+		const movie = madoka.find(({ id }) => id === "11981")
+		expect(result).toMatchObject({
+			title: movie?.title,
+			poster: movie?.posterUrl,
+			mediaKind: "movie",
+			sourceUrl: "https://anilist.co/anime/11981",
+		})
+		expect(result?.episode).toBeUndefined()
+		expect(result?.season).toBeUndefined()
+		expect(await resolver.resolve(file)).toEqual(result)
+		expect(calls.setResolved).toBe(1)
+		expect(search.mock.calls.map(([title]) => title)).toEqual([
+			"Mahou Shoujo Madoka Magica the Movie III - Rebellion",
+			"Mahou Shoujo Madoka Magica",
+		])
+	})
+
+	it("does not use a broad movie fallback after an exact numbered-film match", async () => {
+		const search = vi.fn(async () => madoka as Candidate[])
+		const resolver = new Resolver(fakeCache().cache, { search }, noOverrides())
+		expect(
+			(await resolver.resolve(status("[FS] Mahou Shoujo Madoka Magica Movie III - Rebellion.mkv")))
+				?.sourceUrl,
+		).toBe("https://anilist.co/anime/11981")
+		expect(search).toHaveBeenCalledTimes(1)
+	})
+
+	it("treats an unavailable movie fallback as a transient provider error", async () => {
+		const { cache, unresolvedReasons } = fakeCache()
+		const search = vi.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("offline"))
+		const resolver = new Resolver(cache, { search }, noOverrides())
+		expect(
+			await resolver.resolve(status("[FS] Mahou Shoujo Madoka Magica Movie III - Rebellion.mkv")),
+		).toBeNull()
+		expect(unresolvedReasons).toEqual(["provider-error"])
+	})
+
 	it("returns null for non video media", async () => {
 		const { cache } = fakeCache()
 		const { provider: anilist } = fakeProvider([])
