@@ -3,6 +3,7 @@ import type { LastSentPresence } from "@shared/presence/presence.types"
 import { atom } from "nanostores"
 
 export interface MediaState {
+	playlistId?: number | null
 	mediaStatus: MediaStatus
 	// Basic info (from VLC status)
 	title: string | null
@@ -25,11 +26,7 @@ export interface MediaState {
 	// Enriched info (from media detection)
 	contentType: ContentType | null
 	contentImageUrl: string | null
-	/**
-	 * Where the cover came from, kept apart from `contentImageUrl` because that one
-	 * is usually a data URL by the time it crosses IPC. This is the address a
-	 * correction can be prefilled with.
-	 */
+	/** Original cover address used to prefill a correction. */
 	contentImageSourceUrl: string | null
 	season: number | null
 	episode: number | null
@@ -56,6 +53,7 @@ export interface MediaState {
 }
 
 const INITIAL_STATE: MediaState = {
+	playlistId: null,
 	mediaStatus: "stopped",
 	title: null,
 	artist: null,

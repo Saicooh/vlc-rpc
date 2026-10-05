@@ -368,6 +368,50 @@ function videoService(
 describe.each([{ state: "playing" as const }, { state: "paused" as const }])(
 	"Presence video layout while $state",
 	({ state }) => {
+		it("starts independent video lookups together and preserves local artwork priority", async () => {
+			let finish!: () => void
+			const barrier = new Promise<void>((resolve) => {
+				finish = resolve
+			})
+			const videoArtwork = vi.fn(async () => {
+				await barrier
+				return {
+					imageUrl: CATALOG_COVER,
+					sourceUrl: null,
+					sourceName: null,
+					canonicalTitle: null,
+				}
+			})
+			const localArtwork = vi.fn(async (): Promise<CoverOutcome> => {
+				await barrier
+				return { kind: "published", url: PUBLISHED_COVER }
+			})
+			const episodeTitle = vi.fn(async () => {
+				await barrier
+				return "The Long Night"
+			})
+			const thumbnail = vi.fn(async () => "https://example.test/episode.jpg")
+			config.current = { ...BASE_CONFIG, showEpisodeThumbnails: true }
+			const pending = videoService(
+				SERIES,
+				{ resolve: videoArtwork },
+				undefined,
+				{ fetch: localArtwork },
+				{ resolve: episodeTitle },
+				{ resolve: thumbnail },
+			).getDiscordPresence(videoStatus("Breaking.Bad.S02E05.mkv", state), timeline)
+			await vi.waitFor(() => {
+				expect(videoArtwork).toHaveBeenCalledOnce()
+				expect(localArtwork).toHaveBeenCalledOnce()
+				expect(episodeTitle).toHaveBeenCalledOnce()
+			})
+			finish()
+			const presence = await pending
+			expect(presence?.large_image).toBe(PUBLISHED_COVER)
+			expect(presence?.state).toBe("S2E5 · The Long Night")
+			expect(thumbnail).not.toHaveBeenCalled()
+		})
+
 		it("prefers a published local video cover over a catalog poster", async () => {
 			const service = videoService(
 				FILM,

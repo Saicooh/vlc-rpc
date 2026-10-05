@@ -136,6 +136,162 @@ function fakePresence(data: DiscordPresenceData | null = PRESENCE) {
 }
 
 describe("DiscordRpcHandler update loop", () => {
+	it("discards a VLC status read that finishes after the loop is stopped", async () => {
+		vi.useFakeTimers()
+		let finish!: (value: VlcStatus) => void
+		const readStatus = vi.fn(
+			() =>
+				new Promise<VlcStatus>((resolve) => {
+					finish = resolve
+				}),
+		)
+		const getDiscordPresence = vi.fn(async () => PRESENCE)
+		const discord = fakeDiscord()
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			{ readStatus } as unknown as VlcClient,
+			{ getDiscordPresence } as unknown as PresenceService,
+			new FakeClock(),
+		)
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(readStatus).toHaveBeenCalledOnce()
+		handler.stopUpdateLoop()
+		finish(status())
+		await vi.advanceTimersByTimeAsync(0)
+		expect(getDiscordPresence).not.toHaveBeenCalled()
+		expect(discord.calls.update).toBe(0)
+		expect(handler.getLastPresence()).toEqual({ kind: "cleared", reason: "loop-stopped" })
+	})
+
+	it("keeps polling during a slow lookup and discards its answer after the track changes", async () => {
+		vi.useFakeTimers()
+		let current = status()
+		let finish!: (value: DiscordPresenceData) => void
+		const getDiscordPresence = vi
+			.fn()
+			.mockImplementationOnce(
+				() =>
+					new Promise<DiscordPresenceData>((resolve) => {
+						finish = resolve
+					}),
+			)
+			.mockResolvedValue({ details: "New track" })
+		const discord = fakeDiscord()
+		const update = vi.spyOn(discord.client, "update")
+		const readStatus = vi.fn(async () => current)
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			{ readStatus } as unknown as VlcClient,
+			{ getDiscordPresence } as unknown as PresenceService,
+			new FakeClock(),
+		)
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(3000)
+		expect(readStatus).toHaveBeenCalledTimes(3)
+		expect(getDiscordPresence).toHaveBeenCalledOnce()
+		current = status({ plid: 4, media: { title: "New track" } })
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(update).toHaveBeenCalledExactlyOnceWith({ details: "New track" })
+		finish({ details: "Old track" })
+		await vi.advanceTimersByTimeAsync(0)
+		expect(update).toHaveBeenCalledTimes(1)
+		expect(handler.getLastPresence()).toMatchObject({
+			kind: "sent",
+			presence: { details: "New track" },
+		})
+		handler.stopUpdateLoop()
+	})
+
+	it.each(["pause", "disable", "unavailable"] as const)(
+		"clears on %s while enrichment is pending",
+		async (action) => {
+			vi.useFakeTimers()
+			let current: VlcStatus | null = status()
+			let finish!: (value: DiscordPresenceData) => void
+			const getDiscordPresence = vi.fn(
+				() =>
+					new Promise<DiscordPresenceData>((resolve) => {
+						finish = resolve
+					}),
+			)
+			const discord = fakeDiscord()
+			const handler = new DiscordRpcHandler(
+				discord.client,
+				fakeVlc(() => current),
+				{ getDiscordPresence } as unknown as PresenceService,
+				new FakeClock(),
+			)
+			handler.startUpdateLoop()
+			await vi.advanceTimersByTimeAsync(0)
+			if (action === "pause") {
+				mockHideWhenPaused.value = true
+				current = status({ status: "paused" })
+			} else if (action === "disable") discord.setRpcEnabled(false)
+			else current = null
+			await vi.advanceTimersByTimeAsync(1500)
+			expect(discord.calls.clear).toBe(1)
+			finish(PRESENCE)
+			await vi.advanceTimersByTimeAsync(0)
+			expect(discord.calls.update).toBe(0)
+			handler.stopUpdateLoop()
+		},
+	)
+
+	it("invalidates a pending lookup when a correction forces another update", async () => {
+		vi.useFakeTimers()
+		let finish!: (value: DiscordPresenceData) => void
+		const getDiscordPresence = vi
+			.fn()
+			.mockImplementationOnce(
+				() =>
+					new Promise<DiscordPresenceData>((resolve) => {
+						finish = resolve
+					}),
+			)
+			.mockResolvedValue({ details: "Corrected" })
+		const discord = fakeDiscord()
+		const update = vi.spyOn(discord.client, "update")
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => status()),
+			{ getDiscordPresence } as unknown as PresenceService,
+			new FakeClock(),
+		)
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		handler.forceNextUpdate()
+		await vi.advanceTimersByTimeAsync(1500)
+		finish({ details: "Uncorrected" })
+		await vi.advanceTimersByTimeAsync(0)
+		expect(update).toHaveBeenCalledExactlyOnceWith({ details: "Corrected" })
+		handler.stopUpdateLoop()
+	})
+
+	it("does not publish a lookup that finishes after the loop is stopped", async () => {
+		vi.useFakeTimers()
+		let finish!: (value: DiscordPresenceData) => void
+		const getDiscordPresence = vi.fn(
+			() =>
+				new Promise<DiscordPresenceData>((resolve) => {
+					finish = resolve
+				}),
+		)
+		const discord = fakeDiscord()
+		const handler = new DiscordRpcHandler(
+			discord.client,
+			fakeVlc(() => status()),
+			{ getDiscordPresence } as unknown as PresenceService,
+			new FakeClock(),
+		)
+		handler.startUpdateLoop()
+		await vi.advanceTimersByTimeAsync(0)
+		handler.stopUpdateLoop()
+		finish(PRESENCE)
+		await vi.advanceTimersByTimeAsync(0)
+		expect(discord.calls.update).toBe(0)
+		expect(handler.getLastPresence()).toEqual({ kind: "cleared", reason: "loop-stopped" })
+	})
 	it("rechecks a missing episode title during playback and sends it when found", async () => {
 		vi.useFakeTimers()
 		const clock = new FakeClock()

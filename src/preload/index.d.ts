@@ -47,7 +47,7 @@ declare global {
 				getLastPresence: () => Promise<LastSentPresence>
 			}
 			media: {
-				getMediaInfo: () => Promise<(VlcStatus & DetectedMediaInfo) | null>
+				getMediaInfo: (status?: VlcStatus) => Promise<(VlcStatus & DetectedMediaInfo) | null>
 				retryLookup: () => Promise<boolean>
 				previewFrames: () => Promise<{
 					key: string

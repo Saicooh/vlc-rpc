@@ -11,6 +11,7 @@ import type { Uploader as CoverUploader } from "./cover.uploader"
 export class Resolver {
 	private lastKey: string | null = null
 	private lastOutcome: CoverOutcome | null = null
+	private readonly inflight = new Map<string, Promise<CoverOutcome>>()
 
 	constructor(
 		private readonly vlc: VlcClient,
@@ -36,6 +37,18 @@ export class Resolver {
 			return this.lastOutcome
 		}
 
+		const pending = this.inflight.get(key)
+		if (pending) return pending
+		const lookup = this.resolveAndCache(key, media)
+		this.inflight.set(key, lookup)
+		try {
+			return await lookup
+		} finally {
+			this.inflight.delete(key)
+		}
+	}
+
+	private async resolveAndCache(key: string, media: VlcStatus["media"]): Promise<CoverOutcome> {
 		const outcome = await this.resolve(media)
 		// A failed publish says nothing about the album, only about this attempt,
 		// so it is not remembered: the next poll retries instead of reporting a

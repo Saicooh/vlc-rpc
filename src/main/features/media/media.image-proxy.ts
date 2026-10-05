@@ -2,12 +2,16 @@ import { promises as fs } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { logger } from "@main/core/logger"
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+const IMAGE_TIMEOUT_MS = 8000
+
 /**
  * Images reach the renderer as data URLs: the window's Content Security Policy
  * allows `data:` and `blob:` for images and nothing remote.
  */
 export class ImageProxy {
 	private cache = new Map<string, { dataUrl: string; timestamp: number; bytes: number }>()
+	private readonly inflight = new Map<string, Promise<string | null>>()
 	private cacheBytes = 0
 	private readonly maxCacheEntries = 50
 	private readonly maxCacheBytes = 32 * 1024 * 1024
@@ -31,6 +35,20 @@ export class ImageProxy {
 		}
 		if (cached) this.removeCached(source)
 
+		const pending = this.inflight.get(source)
+		if (pending) return pending
+		const request = this.loadImage(source)
+		this.inflight.set(source, request)
+		try {
+			return await request
+		} finally {
+			this.inflight.delete(source)
+		}
+	}
+
+	private async loadImage(source: string): Promise<string | null> {
+		const controller = new AbortController()
+		const timeout = setTimeout(() => controller.abort(), IMAGE_TIMEOUT_MS)
 		try {
 			let buffer: Buffer
 			let contentType: string
@@ -38,11 +56,14 @@ export class ImageProxy {
 			if (source.startsWith("file://")) {
 				const filePath = fileURLToPath(source)
 				logger.info(`Loading local file: ${this.sanitizeUrl(filePath)}`)
-				buffer = await fs.readFile(filePath)
+				if ((await fs.stat(filePath)).size > MAX_IMAGE_BYTES) throw new Error("Image too large")
+				buffer = await fs.readFile(filePath, { signal: controller.signal })
+				if (buffer.length > MAX_IMAGE_BYTES) throw new Error("Image too large")
 				contentType = this.getContentTypeFromFileName(filePath)
 			} else if (source.startsWith("http://") || source.startsWith("https://")) {
 				logger.info(`Fetching remote image: ${this.sanitizeUrl(source)}`)
 				const response = await fetch(source, {
+					signal: controller.signal,
 					headers: {
 						"User-Agent": "VLC-Discord-RP/5.0 (https://github.com/Saicooh/vlc-rpc)",
 					},
@@ -52,7 +73,7 @@ export class ImageProxy {
 					throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
 				}
 
-				buffer = Buffer.from(await response.arrayBuffer())
+				buffer = await this.readImageBody(response)
 				contentType =
 					response.headers.get("content-type") || this.getContentTypeFromFileName(source)
 			} else {
@@ -66,10 +87,39 @@ export class ImageProxy {
 
 			return dataUrl
 		} catch (error) {
+			controller.abort()
 			logger.error(
 				`Error converting image to data URL: ${error}, Source: ${this.sanitizeUrl(source)}`,
 			)
 			return null
+		} finally {
+			clearTimeout(timeout)
+		}
+	}
+
+	private async readImageBody(response: Response): Promise<Buffer> {
+		if (Number(response.headers.get("content-length")) > MAX_IMAGE_BYTES) {
+			await response.body?.cancel()
+			throw new Error("Image too large")
+		}
+		if (!response.body) return Buffer.alloc(0)
+		const reader = response.body.getReader()
+		const chunks: Uint8Array[] = []
+		let bytes = 0
+		try {
+			while (true) {
+				const { done, value } = await reader.read()
+				if (done) break
+				bytes += value.byteLength
+				if (bytes > MAX_IMAGE_BYTES) {
+					await reader.cancel()
+					throw new Error("Image too large")
+				}
+				chunks.push(value)
+			}
+			return Buffer.concat(chunks, bytes)
+		} finally {
+			reader.releaseLock()
 		}
 	}
 

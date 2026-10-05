@@ -11,6 +11,7 @@ vi.mock("@renderer/features/media/media.actions", () => ({
 
 beforeEach(() => {
 	vi.resetModules()
+	vi.clearAllMocks()
 	vi.useFakeTimers()
 })
 
@@ -20,6 +21,37 @@ afterEach(() => {
 })
 
 describe("VLC status polling", () => {
+	it("passes the same status to enrichment and keeps polling while it is pending", async () => {
+		const documentMock = new EventTarget()
+		Object.defineProperty(documentMock, "visibilityState", { value: "visible" })
+		vi.stubGlobal("document", documentMock)
+		const playing = { active: true }
+		const getStatus = vi.fn(async () => playing)
+		vi.stubGlobal("window", {
+			api: {
+				vlc: {
+					getConfig: async () => ({}),
+					checkStatus: async () => ({ isRunning: true, reason: "running" }),
+					getStatus,
+				},
+				app: { isVisible: async () => true, onVisibilityChange: () => {} },
+			},
+		})
+		const { refreshMediaInfo } = await import("@renderer/features/media/media.actions")
+		let finish!: () => void
+		vi.mocked(refreshMediaInfo).mockReturnValue(
+			new Promise<void>((resolve) => {
+				finish = resolve
+			}),
+		)
+		const { initializeVlcStore } = await import("./vlc.actions")
+		await initializeVlcStore()
+		await vi.advanceTimersByTimeAsync(6000)
+		expect(getStatus).toHaveBeenCalledTimes(4)
+		expect(refreshMediaInfo).toHaveBeenCalledWith(playing)
+		finish()
+		vi.mocked(refreshMediaInfo).mockReset()
+	})
 	it("pauses in the tray even when Electron reports the document as visible", async () => {
 		let visibility: DocumentVisibilityState = "visible"
 		const documentMock = new EventTarget()

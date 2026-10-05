@@ -25,8 +25,11 @@ function needsEpisodeRetry(status: VlcStatus): boolean {
 
 export class DiscordRpcHandler {
 	private pollIntervalId: NodeJS.Timeout | null = null
-	private updateInFlight: Promise<boolean> | null = null
-	private updateTail: Promise<void> = Promise.resolve()
+	private statusRead: Promise<VlcStatus | null> | null = null
+	private publishTail: Promise<void> = Promise.resolve()
+	private pendingUpdate: { key: string; revision: number; promise: Promise<boolean> } | null = null
+	private desiredKey: string | null = null
+	private revision = 0
 	private readonly timeline: Timeline
 	private lastSentKey: string | null = null
 	private wasConnected = false
@@ -53,6 +56,8 @@ export class DiscordRpcHandler {
 	 */
 	public forceNextUpdate(): void {
 		this.lastSentKey = null
+		this.desiredKey = null
+		this.revision++
 	}
 
 	private registerHandlers(): void {
@@ -142,14 +147,14 @@ export class DiscordRpcHandler {
 			this.pollIntervalId = null
 		}
 
-		this.lastSentKey = null
+		this.forceNextUpdate()
 		this.wasConnected = false
 		this.presenceCleared = false
 		this.nextArtworkRetryAt = 0
 		this.nextEpisodeRetryAt = 0
 		this.lastPresence = { kind: "cleared", reason: "loop-stopped" }
 
-		this.discord.clear().catch((error) => {
+		this.pushClear("loop-stopped").catch((error) => {
 			logger.error(`Error clearing Discord presence: ${error}`)
 		})
 	}
@@ -160,20 +165,36 @@ export class DiscordRpcHandler {
 	 * always resends right after a reconnect since Discord has lost state.
 	 */
 	private updatePresence(force: boolean): Promise<boolean> {
-		// A slow lookup or Discord clear can outlast the poll interval. Process
-		// updates in order, and let ordinary ticks share the pending result.
-		if (!force && this.updateInFlight) return this.updateInFlight
-		const update = this.updateTail.then(() => this.performUpdatePresence(force))
-		this.updateInFlight = update
-		this.updateTail = update.then(
-			() => {
-				if (this.updateInFlight === update) this.updateInFlight = null
-			},
-			() => {
-				if (this.updateInFlight === update) this.updateInFlight = null
-			},
+		if (force) this.forceNextUpdate()
+		return this.performUpdatePresence(force)
+	}
+
+	private async readCurrentStatus(force: boolean): Promise<VlcStatus | null> {
+		if (this.statusRead) return this.statusRead
+		const read = this.vlc.readStatus(force)
+		this.statusRead = read
+		try {
+			return await read
+		} finally {
+			if (this.statusRead === read) this.statusRead = null
+		}
+	}
+
+	private setDesiredKey(key: string): void {
+		if (this.desiredKey !== key) {
+			this.desiredKey = key
+			this.revision++
+		}
+	}
+
+	// Only Discord writes are ordered. Catalog lookups must not hold up the next VLC read.
+	private publish(work: () => Promise<boolean>): Promise<boolean> {
+		const result = this.publishTail.then(work)
+		this.publishTail = result.then(
+			() => {},
+			() => {},
 		)
-		return update
+		return result
 	}
 
 	private async performUpdatePresence(force: boolean): Promise<boolean> {
@@ -187,8 +208,11 @@ export class DiscordRpcHandler {
 			const isConnected = this.discord.isConnected()
 			const justReconnected = isConnected && !this.wasConnected
 			this.wasConnected = isConnected
+			if (justReconnected) this.presenceCleared = false
 
-			const vlcStatus = await this.vlc.readStatus(force)
+			const readRevision = this.revision
+			const vlcStatus = await this.readCurrentStatus(force)
+			if (readRevision !== this.revision) return false
 			if (!vlcStatus) {
 				return this.pushClear("vlc-unavailable")
 			}
@@ -206,6 +230,7 @@ export class DiscordRpcHandler {
 				vlcStatus.mediaType === "video"
 					? `${mediaKey}|es:${configService.get("preferSpanishEpisodeTitles") === true}|thumb:${configService.get("showEpisodeThumbnails") === true}`
 					: mediaKey
+			this.setDesiredKey(key)
 			const sameKey = key === this.lastSentKey
 			const retryArtwork =
 				sameKey &&
@@ -219,43 +244,62 @@ export class DiscordRpcHandler {
 				return true
 			}
 
-			const presenceData = await this.presence.getDiscordPresence(vlcStatus, window)
-			if (!presenceData) {
-				return this.pushClear("playback-stopped")
+			const revision = this.revision
+			if (this.pendingUpdate?.key === key && this.pendingUpdate.revision === revision) {
+				return await this.pendingUpdate.promise
 			}
-			if (
-				(retryArtwork || retryEpisode) &&
-				!force &&
-				!justReconnected &&
-				this.lastPresence.kind === "sent" &&
-				isDeepStrictEqual(presenceData, this.lastPresence.presence)
-			) {
-				if (retryArtwork) this.nextArtworkRetryAt = this.clock.now() + ARTWORK_RETRY_MS
-				if (retryEpisode) this.nextEpisodeRetryAt = this.clock.now() + EPISODE_RETRY_MS
-				return true
-			}
-
-			const sent = await this.discord.update(presenceData)
-			if (sent) {
-				this.lastSentKey = key
-				this.presenceCleared = false
-				this.nextArtworkRetryAt =
-					presenceData.large_image === configService.get("largeImage")
-						? this.clock.now() + ARTWORK_RETRY_MS
-						: 0
-				this.nextEpisodeRetryAt = needsEpisodeRetry(vlcStatus)
-					? this.clock.now() + EPISODE_RETRY_MS
-					: 0
-				// Recorded only once Discord accepted it, so a refused update never
-				// shows up as an activity nobody can see.
-				this.lastPresence = {
-					kind: "sent",
-					presence: presenceData,
-					sentAt: this.clock.now(),
-					applicationName: this.discord.applicationName(),
+			const update = (async () => {
+				const presenceData = await this.presence.getDiscordPresence(vlcStatus, window)
+				if (revision !== this.revision) return false
+				if (!presenceData) {
+					return this.pushClear("playback-stopped")
 				}
+				if (
+					(retryArtwork || retryEpisode) &&
+					!force &&
+					!justReconnected &&
+					this.lastPresence.kind === "sent" &&
+					isDeepStrictEqual(presenceData, this.lastPresence.presence)
+				) {
+					if (retryArtwork) this.nextArtworkRetryAt = this.clock.now() + ARTWORK_RETRY_MS
+					if (retryEpisode) this.nextEpisodeRetryAt = this.clock.now() + EPISODE_RETRY_MS
+					return true
+				}
+
+				return this.publish(async () => {
+					if (revision !== this.revision || !this.discord.isRpcEnabled()) return false
+					if (revision !== this.revision) return false
+					const sent = await this.discord.update(presenceData)
+					if (sent) this.presenceCleared = false
+					if (revision !== this.revision) return false
+					if (sent) {
+						this.lastSentKey = key
+						this.presenceCleared = false
+						this.nextArtworkRetryAt =
+							presenceData.large_image === configService.get("largeImage")
+								? this.clock.now() + ARTWORK_RETRY_MS
+								: 0
+						this.nextEpisodeRetryAt = needsEpisodeRetry(vlcStatus)
+							? this.clock.now() + EPISODE_RETRY_MS
+							: 0
+						// Recorded only once Discord accepted it, so a refused update never
+						// shows up as an activity nobody can see.
+						this.lastPresence = {
+							kind: "sent",
+							presence: presenceData,
+							sentAt: this.clock.now(),
+							applicationName: this.discord.applicationName(),
+						}
+					}
+					return sent
+				})
+			})()
+			this.pendingUpdate = { key, revision, promise: update }
+			try {
+				return await update
+			} finally {
+				if (this.pendingUpdate?.promise === update) this.pendingUpdate = null
 			}
-			return sent
 		} catch (error) {
 			logger.error(`Error updating Discord presence: ${error}`)
 			return false
@@ -268,11 +312,23 @@ export class DiscordRpcHandler {
 	 * Discord was not connected at the time.
 	 */
 	private async pushClear(reason: PresenceClearReason): Promise<boolean> {
+		this.setDesiredKey(`clear:${reason}`)
 		this.lastSentKey = null
 		this.nextArtworkRetryAt = 0
 		this.nextEpisodeRetryAt = 0
 		this.lastPresence = { kind: "cleared", reason }
+		const revision = this.revision
+		return this.publish(async () => {
+			if (revision !== this.revision) return false
+			return this.clearPresence(reason)
+		})
+	}
 
+	private async clearPresence(reason: PresenceClearReason): Promise<boolean> {
+		this.lastSentKey = null
+		this.nextArtworkRetryAt = 0
+		this.nextEpisodeRetryAt = 0
+		this.lastPresence = { kind: "cleared", reason }
 		if (this.presenceCleared) {
 			return true
 		}

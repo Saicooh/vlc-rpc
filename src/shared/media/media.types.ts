@@ -32,15 +32,9 @@ export interface DetectedMediaInfo {
 	}
 	content_type?: ContentType
 	content_metadata?: ContentMetadata
-	/**
-	 * What to draw: a data URL once the cover has been proxied, since the
-	 * renderer cannot fetch a remote image itself.
-	 */
+	/** Image source; the renderer requests its bytes separately when this changes. */
 	content_image_url?: string
-	/**
-	 * Where that image came from. Kept beside the proxied one because a data URL
-	 * is not an address: it cannot prefill a correction form or be stored.
-	 */
+	/** Original address used to prefill a correction form. */
 	content_image_source_url?: string
 	/**
 	 * Where a manual correction for what is playing is filed, which is what

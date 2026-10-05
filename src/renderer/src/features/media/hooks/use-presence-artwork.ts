@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react"
-import { getProxiedImage } from "../media.actions"
+import { useProxiedImage } from "./use-proxied-image"
 
 /**
  * The image Discord was actually handed, not the one this screen would have picked:
@@ -12,24 +11,5 @@ import { getProxiedImage } from "../media.actions"
  * card's placeholder.
  */
 export function usePresenceArtwork(largeImage: string | undefined): string | null {
-	const [proxiedUrl, setProxiedUrl] = useState<string | null>(null)
-
-	useEffect(() => {
-		if (!largeImage || !/^https?:\/\//i.test(largeImage)) {
-			setProxiedUrl(null)
-			return
-		}
-
-		let current = true
-		getProxiedImage(largeImage).then((url) => {
-			if (current) {
-				setProxiedUrl(url)
-			}
-		})
-		return () => {
-			current = false
-		}
-	}, [largeImage])
-
-	return proxiedUrl
+	return useProxiedImage(largeImage && /^https?:\/\//i.test(largeImage) ? largeImage : null)
 }

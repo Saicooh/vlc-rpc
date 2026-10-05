@@ -4,6 +4,7 @@ import { mergeVlcStatus, stampsAgree } from "./media.mapper"
 import type { MediaState } from "./media.store"
 
 const EMPTY: MediaState = {
+	playlistId: null,
 	nameSource: null,
 	mediaStatus: "stopped",
 	title: null,

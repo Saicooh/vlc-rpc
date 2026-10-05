@@ -135,9 +135,9 @@ export class MediaInfoHandler {
 	}
 
 	private registerHandlers(): void {
-		registerHandler("media:get-info", async () => {
+		registerHandler("media:get-info", async (status) => {
 			try {
-				const currentStatus = await this.vlc.readStatus(false)
+				const currentStatus = status ?? (await this.vlc.readStatus(false))
 
 				if (!currentStatus || !currentStatus.active) {
 					return null
@@ -258,22 +258,9 @@ export class MediaInfoHandler {
 				mediaInfo.metadata_diagnostic = diagnostic
 			}
 
-			if (mediaInfo.media?.artworkUrl) {
-				const dataUrl = await this.imageProxy.getImageAsDataUrl(mediaInfo.media.artworkUrl)
-				if (dataUrl) {
-					mediaInfo.media.artworkUrl = dataUrl
-				}
-			}
-
 			if (mediaInfo.content_image_url) {
 				mediaInfo.content_image_source_url = mediaInfo.content_image_url
-
-				const dataUrl = await this.imageProxy.getImageAsDataUrl(mediaInfo.content_image_url)
-				if (dataUrl) {
-					mediaInfo.content_image_url = dataUrl
-				}
 			}
-
 			return mediaInfo
 		} catch (error) {
 			logger.error(`Error processing media info: ${error}`)

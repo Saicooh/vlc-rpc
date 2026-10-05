@@ -124,6 +124,27 @@ describe("Resolver outcomes", () => {
 		rmSync(root, { recursive: true, force: true })
 	})
 
+	it("shares an upload between concurrent consumers of the same album", async () => {
+		let finish!: (url: string) => void
+		const uploadImage = vi.fn(
+			() =>
+				new Promise<string>((resolve) => {
+					finish = resolve
+				}),
+		)
+		const vlc = fakeVlc()
+		const playlist = vi.spyOn(vlc, "getCurrentFileUri")
+		const resolver = new Resolver(vlc, fakeStore(), fakeUploader(uploadImage))
+		const playing = status({ artist: "Artist", album: "Album", artworkUrl })
+		const first = resolver.fetch(playing)
+		const second = resolver.fetch({ ...playing, media: { ...playing.media, title: "Next track" } })
+		await vi.waitFor(() => expect(uploadImage).toHaveBeenCalledOnce())
+		finish("https://example.test/shared.jpg")
+		expect(await first).toEqual(await second)
+		expect(playlist).toHaveBeenCalledOnce()
+		expect(uploadImage).toHaveBeenCalledOnce()
+	})
+
 	it("publishes the artwork embedded in the file and reports its url", async () => {
 		const uploader = fakeUploader(async () => "https://0x0.st/cover.jpg")
 		const resolver = new Resolver(fakeVlc(), fakeStore(), uploader)

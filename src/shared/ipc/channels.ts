@@ -99,7 +99,10 @@ export interface IpcInvokeChannelMap {
 	"discord:presence:last": { request: []; response: LastSentPresence }
 
 	// ── Media ───────────────────────────────────────────────────────────────
-	"media:get-info": { request: []; response: (VlcStatus & DetectedMediaInfo) | null }
+	"media:get-info": {
+		request: [status?: VlcStatus]
+		response: (VlcStatus & DetectedMediaInfo) | null
+	}
 	"media:retry-lookup": { request: []; response: boolean }
 	"media:preview-frames": {
 		request: []

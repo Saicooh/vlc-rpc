@@ -116,7 +116,7 @@ async function refreshVlcStatus(): Promise<void> {
 		if (status) {
 			vlcStatusStore.set("connected")
 			updateFromVlcStatus(status)
-			await refreshMediaInfo()
+			void refreshMediaInfo(status)
 		} else {
 			await checkVlcConnection()
 		}

@@ -32,6 +32,7 @@ const NOTHING_PLAYING = {
 	position: null,
 	artwork: null,
 	fileTitle: null,
+	playlistId: null,
 	sourceUri: null,
 	mediaType: null,
 	discTitle: null,
@@ -56,6 +57,10 @@ export function mergeVlcStatus(previous: MediaState, status: VlcStatus | null): 
 
 	const { media, playback } = status
 	const fileTitle = media.title || null
+	const sameFile =
+		previous.fileTitle === fileTitle &&
+		(previous.playlistId === undefined || previous.playlistId === status.plid) &&
+		(!media.sourceUri || previous.sourceUri === media.sourceUri)
 
 	const playing = {
 		mediaStatus: status.status === "playing" ? ("playing" as const) : ("paused" as const),
@@ -65,11 +70,12 @@ export function mergeVlcStatus(previous: MediaState, status: VlcStatus | null): 
 		discTitle: status.disc?.title ?? null,
 		chapter: status.disc?.chapter ?? null,
 		fileTitle,
-		sourceUri: media.sourceUri ?? null,
+		playlistId: status.plid,
+		sourceUri: media.sourceUri ?? (sameFile ? previous.sourceUri : null),
 		nowPlaying: media.nowPlaying || null,
 	}
 
-	if (previous.fileTitle === fileTitle) {
+	if (sameFile) {
 		// VLC owns these two alone, and it can attach cover art a beat after it
 		// starts reporting the file, so a later answer adds and never takes away.
 		return {
@@ -100,6 +106,8 @@ export function mergeVlcStatus(previous: MediaState, status: VlcStatus | null): 
  */
 export interface InfoStamp {
 	file: string | null
+	plid?: number | null
+	uri?: string | null
 	corrections: number
 }
 
@@ -110,5 +118,10 @@ export interface InfoStamp {
  * already been shown, which reads as the app changing its mind.
  */
 export function stampsAgree(asked: InfoStamp, current: InfoStamp): boolean {
-	return asked.file === current.file && asked.corrections === current.corrections
+	return (
+		asked.file === current.file &&
+		asked.plid === current.plid &&
+		asked.uri === current.uri &&
+		asked.corrections === current.corrections
+	)
 }

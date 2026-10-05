@@ -3,13 +3,29 @@ import type { CoverOutcome } from "@main/features/cover"
 import type { MusicResult } from "@main/features/music"
 import type { Client as VlcClient } from "@main/features/vlc"
 import type { VlcStatus } from "@shared/vlc/vlc.types"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@main/core/logger", () => ({
 	logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }))
 
-vi.mock("@main/core/ipc", () => ({ registerHandler: () => {} }))
+const { mediaRead } = vi.hoisted(() => ({
+	mediaRead: {
+		handler: undefined as
+			| ((
+					status?: VlcStatus,
+			  ) => Promise<(VlcStatus & import("@shared/media/media.types").DetectedMediaInfo) | null>)
+			| undefined,
+	},
+}))
+vi.mock("@main/core/ipc", () => ({
+	registerHandler: (channel: string, handler: typeof mediaRead.handler) => {
+		if (channel === "media:get-info") mediaRead.handler = handler
+	},
+}))
+beforeEach(() => {
+	mediaRead.handler = undefined
+})
 
 import { Resolver as ArtworkResolver } from "@main/features/artwork"
 import type { CorrectedTags, OverrideTarget } from "@main/features/overrides"
@@ -70,15 +86,41 @@ function build(
 		overrideTargetFor: async () => target,
 		correctedTagsFor: async () => corrected,
 	}
-	const vlc = { readStatus: async () => null } as unknown as VlcClient
+	const readStatus = vi.fn(async () => null)
+	const vlc = { readStatus } as unknown as VlcClient
 	// Null by default, which keeps every URL as it was resolved, so the
 	// assertions read the decision under test rather than a data URL.
-	const imageProxy = { getImageAsDataUrl: async () => proxied } as unknown as ImageProxy
+	const proxyImage = vi.fn(async () => proxied)
+	const imageProxy = { getImageAsDataUrl: proxyImage } as unknown as ImageProxy
 
-	return { handler: new MediaInfoHandler(artwork, catalog, music, vlc, imageProxy), calls }
+	return {
+		handler: new MediaInfoHandler(
+			artwork,
+			catalog,
+			music,
+			vlc,
+			imageProxy,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+		),
+		calls,
+		readStatus,
+		proxyImage,
+	}
 }
 
 describe("MediaInfoHandler audio artwork", () => {
+	it("enriches the renderer's status without requesting it from VLC a second time", async () => {
+		const { readStatus, proxyImage } = build({ kind: "published", url: PUBLISHED_COVER })
+		const info = await mediaRead.handler?.(status(LOCAL_ARTWORK))
+		expect(info?.content_image_url).toBe(PUBLISHED_COVER)
+		expect(readStatus).not.toHaveBeenCalled()
+		expect(proxyImage).not.toHaveBeenCalled()
+		await mediaRead.handler?.()
+		expect(readStatus).toHaveBeenCalledOnce()
+	})
 	it("reports the published artwork and consults no catalog", async () => {
 		const { handler, calls } = build({ kind: "published", url: PUBLISHED_COVER })
 
@@ -455,7 +497,7 @@ describe("MediaInfoHandler override key", () => {
 const PROXIED = "data:image/jpeg;base64,MA=="
 
 describe("MediaInfoHandler cover address", () => {
-	it("keeps the address a cover came from beside the data URL it proxied it to", async () => {
+	it("returns the cover address without embedding image bytes in each metadata response", async () => {
 		const { handler } = build(
 			{ kind: "published", url: PUBLISHED_COVER },
 			catalogHit,
@@ -465,11 +507,13 @@ describe("MediaInfoHandler cover address", () => {
 
 		const info = await handler.getMediaInfo(status(LOCAL_ARTWORK))
 
-		expect(info?.content_image_url).toBe(PROXIED)
+		expect(info?.content_image_url).toBe(PUBLISHED_COVER)
 		expect(info?.content_image_source_url).toBe(PUBLISHED_COVER)
+		expect(info?.media.artworkUrl).toBe(LOCAL_ARTWORK)
+		expect(JSON.stringify(info)).not.toContain("base64")
 	})
 
-	it("keeps the poster address beside the data URL it proxied it to", async () => {
+	it("returns the poster address without converting it for every poll", async () => {
 		const handler = buildVideo(
 			{ title: "Akira", poster: CATALOG_POSTER, mediaKind: "movie" },
 			null,
@@ -478,7 +522,7 @@ describe("MediaInfoHandler cover address", () => {
 
 		const info = await handler.getMediaInfo(videoStatus("Akira.1988.1080p.mkv"))
 
-		expect(info?.content_image_url).toBe(PROXIED)
+		expect(info?.content_image_url).toBe(CATALOG_POSTER)
 		expect(info?.content_image_source_url).toBe(CATALOG_POSTER)
 	})
 

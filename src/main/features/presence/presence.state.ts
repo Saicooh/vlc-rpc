@@ -317,11 +317,14 @@ class PlayingState extends MediaState {
 			(!isBluRaySource(media.sourceUri) || bluRayFolderTitle(media.sourceUri))
 				? parseVideo(videoName, mediaInfo.playback.duration)
 				: null
-		const videoCover =
-			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
-		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
-		const externalEpisodeTitle =
-			mediaType === "video" ? await this.episodeTitles.resolve(mediaInfo, catalogResult) : null
+		const [videoCover, localCover, externalEpisodeTitle] =
+			mediaType === "video"
+				? await Promise.all([
+						this.videoArtwork.resolve(mediaInfo, catalogResult),
+						this.localVideoArtwork.fetch(mediaInfo),
+						this.episodeTitles.resolve(mediaInfo, catalogResult),
+					])
+				: [null, null, null]
 		const episodeThumbnail =
 			config.showEpisodeThumbnails === true &&
 			mediaType === "video" &&
@@ -454,11 +457,14 @@ class PausedState extends MediaState {
 			(!isBluRaySource(media.sourceUri) || bluRayFolderTitle(media.sourceUri))
 				? parseVideo(videoName, mediaInfo.playback.duration)
 				: null
-		const videoCover =
-			mediaType === "video" ? await this.videoArtwork.resolve(mediaInfo, catalogResult) : null
-		const localCover = mediaType === "video" ? await this.localVideoArtwork.fetch(mediaInfo) : null
-		const externalEpisodeTitle =
-			mediaType === "video" ? await this.episodeTitles.resolve(mediaInfo, catalogResult) : null
+		const [videoCover, localCover, externalEpisodeTitle] =
+			mediaType === "video"
+				? await Promise.all([
+						this.videoArtwork.resolve(mediaInfo, catalogResult),
+						this.localVideoArtwork.fetch(mediaInfo),
+						this.episodeTitles.resolve(mediaInfo, catalogResult),
+					])
+				: [null, null, null]
 		const episodeThumbnail =
 			config.showEpisodeThumbnails === true &&
 			mediaType === "video" &&

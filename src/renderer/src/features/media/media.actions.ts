@@ -9,25 +9,58 @@ import { correctionStore, lastPresenceStore, mediaStore } from "./media.store"
  * an older count describes a file the app has since been told it got wrong.
  */
 let corrections = 0
+let playbackRevision = 0
+let pendingInfo: { stamp: InfoStamp; revision: number; promise: Promise<void> } | null = null
 
 function stampNow(): InfoStamp {
-	return { file: mediaStore.get().fileTitle, corrections }
+	const current = mediaStore.get()
+	return {
+		file: current.fileTitle,
+		uri: current.sourceUri,
+		plid: current.playlistId ?? null,
+		corrections,
+	}
 }
 
 export function updateFromVlcStatus(status: VlcStatus | null): void {
-	mediaStore.set(mergeVlcStatus(mediaStore.get(), status))
+	const previous = mediaStore.get()
+	const current = mergeVlcStatus(previous, status)
+	if (
+		previous.fileTitle !== current.fileTitle ||
+		previous.sourceUri !== current.sourceUri ||
+		previous.playlistId !== current.playlistId
+	) {
+		playbackRevision += 1
+	}
+	mediaStore.set(current)
 }
 
-export async function refreshMediaInfo(): Promise<void> {
+export function refreshMediaInfo(status?: VlcStatus): Promise<void> {
+	const asked = stampNow()
+	// Polls share pending enrichment; a manual correction always asks again.
+	if (status && pendingInfo?.revision === playbackRevision && stampsAgree(asked, pendingInfo.stamp))
+		return pendingInfo.promise
+	const promise = readMediaInfo(asked, playbackRevision, status)
+	pendingInfo = { stamp: asked, revision: playbackRevision, promise }
+	void promise.finally(() => {
+		if (pendingInfo?.promise === promise) pendingInfo = null
+	})
+	return promise
+}
+
+async function readMediaInfo(
+	asked: InfoStamp,
+	revision: number,
+	status?: VlcStatus,
+): Promise<void> {
 	try {
 		if (vlcStatusStore.get() !== "connected") {
 			return
 		}
 
-		const asked = stampNow()
-		const mediaInfo = await window.api.media.getMediaInfo()
+		const mediaInfo = await window.api.media.getMediaInfo(status)
 
-		if (!stampsAgree(asked, stampNow())) {
+		if (revision !== playbackRevision || !stampsAgree(asked, stampNow())) {
 			return
 		}
 
@@ -58,6 +91,7 @@ export async function refreshMediaInfo(): Promise<void> {
 
 		mediaStore.set({
 			...mediaStore.get(),
+			sourceUri: mediaInfo.media.sourceUri ?? null,
 			contentType: mediaInfo.content_type || null,
 			contentImageUrl: mediaInfo.content_image_url || null,
 			contentImageSourceUrl: mediaInfo.content_image_source_url || null,
