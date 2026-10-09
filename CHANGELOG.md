@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.1
+
+### Patch Changes
+
+- 9b42dfa: Tracks and albums with one-character names can now update Discord Rich Presence. Invisible padding keeps these names looking the same while avoiding Discord's minimum text length rejection, including in custom layouts.
+
 ## 5.3.0
 
 ### Minor Changes
