@@ -10,6 +10,11 @@ import {
 	StatusDisplayType,
 } from "@xhayper/discord-rpc"
 
+// Discord rejects single-character RPC text; invisible padding preserves the visible title.
+function rpcText(text: string): string {
+	return text.length === 1 ? `${text}\u200b` : text
+}
+
 export class Client {
 	private rpc: RpcClient | null = null
 	private connected = false
@@ -225,19 +230,19 @@ export class Client {
 			// Discord draws this as a line of the activity, not only as hover text, so a
 			// default here would be words nobody asked for sitting on a profile.
 			if (presenceData.large_text) {
-				activity.largeImageText = presenceData.large_text
+				activity.largeImageText = rpcText(presenceData.large_text)
 			}
 
 			if (presenceData.details !== undefined) {
-				activity.details = presenceData.details
+				activity.details = rpcText(presenceData.details)
 			}
 
 			if (presenceData.state !== undefined) {
-				activity.state = presenceData.state
+				activity.state = rpcText(presenceData.state)
 			}
 
 			if (presenceData.name) {
-				activity.name = presenceData.name
+				activity.name = rpcText(presenceData.name)
 			}
 
 			if (presenceData.small_image) {
@@ -245,7 +250,7 @@ export class Client {
 			}
 
 			if (presenceData.small_text) {
-				activity.smallImageText = presenceData.small_text
+				activity.smallImageText = rpcText(presenceData.small_text)
 			}
 
 			// The presence carries seconds, Discord's client takes milliseconds.
